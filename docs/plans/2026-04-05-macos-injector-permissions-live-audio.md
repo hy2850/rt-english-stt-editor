@@ -386,3 +386,9 @@ git commit -m "Document macOS injector and live capture workflow"
 - Keep heavy work out of callbacks and away from low-level macOS event helpers.
 - Prefer explicit runtime errors over silent no-ops when permissions or macOS-only dependencies are missing.
 - Keep commits small and Lore-compliant.
+
+## Implementation notes after batch execution
+
+- The armed target now persists in `.omx/runtime/active_anchor.json` so `arm-target` and `paste-demo` can run as separate CLI invocations.
+- The current injector implementation uses the existing optional AX hook but does not add a dedicated AX writer in this batch; the working macOS path is click + clipboard-preserving paste.
+- Core dependencies were added in `pyproject.toml` for YAML config loading, sounddevice capture, and macOS framework bindings.

@@ -16,15 +16,16 @@ Local macOS MVP for turning spoken English into cleaned-up text and inserting it
 
 ## Current project status
 
-This repository currently contains the **foundation MVP scaffold**:
+This repository currently contains the **next local MVP slice**:
 
 - domain models and protocols
-- cleanup pipeline
-- formatting helpers
-- orchestrator with duplicate-insert guard
-- STT adapter boundary for Cohere MLX
-- injector and audio service scaffolding
-- unit tests for the current core behavior
+- cleanup pipeline and orchestrator core
+- macOS permission reporting
+- persistent target arming from the current mouse position
+- hybrid click + clipboard-preserving paste injection
+- queue-based live microphone capture
+- CLI commands for manual local verification
+- unit tests for the current behavior
 
 The next batch is planned in:
 
@@ -104,16 +105,17 @@ source .venv/bin/activate
 python3 -m pip install -e .
 ```
 
-### 4. Run the current CLI stub
+### 4. Run the current CLI workflow
 
 ```bash
 python3 -m realtime_stt_writer.app.main --help
-python3 -m realtime_stt_writer.app.main start
+python3 -m realtime_stt_writer.app.main check-permissions
 python3 -m realtime_stt_writer.app.main arm-target
-python3 -m realtime_stt_writer.app.main retry-last
+python3 -m realtime_stt_writer.app.main paste-demo --text "Hello from the injector."
+python3 -m realtime_stt_writer.app.main start-capture
 ```
 
-At the moment, the CLI is still mostly a scaffold and does not yet perform real macOS injection or live capture.
+`start-capture` keeps the process alive until you interrupt it with `Ctrl-C`.
 
 ## How to run tests
 
@@ -144,11 +146,11 @@ Current config surface includes:
 
 ## Known limitations right now
 
-- No real macOS Accessibility integration yet
-- No live microphone capture implementation yet
-- No fully wired end-to-end STT loop yet
+- No end-to-end live STT transcription loop yet
+- No dedicated AX direct-text injector yet; the current prototype relies on click + paste fallback
 - No hotkey runtime yet
 - No menu bar app yet
+- Manual editor smoke checks still need to be run on macOS hardware
 
 ## Development notes
 
