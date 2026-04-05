@@ -8,6 +8,7 @@ audio:
   channels: 1
   preferred_sample_rate: 16000
   block_ms: 30
+  capture_queue_size: 32
   pre_roll_ms: 250
   max_segment_sec: 12
 
