@@ -113,9 +113,10 @@ python3 -m realtime_stt_writer.app.main check-permissions
 python3 -m realtime_stt_writer.app.main arm-target
 python3 -m realtime_stt_writer.app.main paste-demo --text "Hello from the injector."
 python3 -m realtime_stt_writer.app.main start-capture
+python3 -m realtime_stt_writer.app.main start
 ```
 
-`start-capture` keeps the process alive until you interrupt it with `Ctrl-C`.
+`start-capture` keeps raw capture alive until `Ctrl-C`. Use `start` for the full live English capture → endpointing → STT → cleanup → insertion loop.
 
 ## How to run tests
 
@@ -146,11 +147,11 @@ Current config surface includes:
 
 ## Known limitations right now
 
-- No end-to-end live STT transcription loop yet
+- Live STT now runs through the CLI `start` command, but still requires macOS permissions, microphone hardware, and the configured MLX STT model locally
 - No dedicated AX direct-text injector yet; the current prototype relies on click + paste fallback
 - No hotkey runtime yet
 - No menu bar app yet
-- Manual editor smoke checks still need to be run on macOS hardware
+- Manual editor and microphone smoke checks still need to be run on macOS hardware
 
 ## Development notes
 

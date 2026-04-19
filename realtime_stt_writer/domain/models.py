@@ -7,6 +7,14 @@ from typing import Mapping
 
 
 @dataclass(slots=True)
+class AudioFrame:
+    samples: list[float]
+    sample_rate: int
+    timestamp: float
+    status: object | None = None
+
+
+@dataclass(slots=True)
 class FinalizedSegment:
     audio: Any
     sample_rate: int

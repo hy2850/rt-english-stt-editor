@@ -12,6 +12,7 @@ from realtime_stt_writer.domain.models import TargetAnchor
 
 
 CaptureRunner = Callable[[object, TextIO], None]
+LiveRunner = Callable[[object, TextIO], None]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,8 +30,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser('arm-target', help='Arm the current mouse target for later paste injection')
     paste_demo = subparsers.add_parser('paste-demo', help='Inject demo text into the armed target')
     paste_demo.add_argument('--text', required=True, help='Text to insert into the armed target')
-    subparsers.add_parser('start-capture', help='Start live microphone capture until interrupted')
-    subparsers.add_parser('start', help='Reserved for the full runtime loop')
+    subparsers.add_parser('start-capture', help='Start raw microphone capture until interrupted')
+    subparsers.add_parser('start', help='Start live English speech transcription and insertion')
     subparsers.add_parser('retry-last', help='Reserved for retrying the last insert')
     return parser
 
@@ -41,6 +42,7 @@ def main(
     stdout: TextIO | None = None,
     bootstrap_factory=build_runtime,
     capture_runner: CaptureRunner | None = None,
+    live_runner: LiveRunner | None = None,
 ) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -69,6 +71,13 @@ def main(
         runner(runtime.microphone_capture, out)
         return 0
 
+    if args.command == 'start':
+        runtime.live_loop.start()
+        out.write('Listening for English speech. Press Ctrl-C to stop.\n')
+        runner = live_runner or _run_live_session
+        runner(runtime.live_loop, out)
+        return 0
+
     out.write(f"Command '{args.command}' is not wired yet.\n")
     return 0
 
@@ -85,7 +94,14 @@ def _describe_anchor(anchor: TargetAnchor | None) -> str:
     if anchor is None:
         return 'unarmed target'
 
-    label = anchor.app_name or anchor.bundle_id or f'pid={anchor.pid}' if anchor.pid is not None else 'unknown app'
+    if anchor.app_name:
+        label = anchor.app_name
+    elif anchor.bundle_id:
+        label = anchor.bundle_id
+    elif anchor.pid is not None:
+        label = f'pid={anchor.pid}'
+    else:
+        label = 'unknown app'
     return f'{label} at ({anchor.x:.1f}, {anchor.y:.1f})'
 
 
@@ -99,6 +115,21 @@ def _run_capture_session(capture: object, stdout: TextIO) -> None:
         if hasattr(capture, 'stop'):
             capture.stop()
         stdout.write('Capture stopped.\n')
+
+
+def _run_live_session(loop: object, stdout: TextIO) -> None:
+    try:
+        if hasattr(loop, 'run_until_interrupted'):
+            loop.run_until_interrupted()
+        else:
+            while getattr(loop, 'is_running', False):
+                time.sleep(0.25)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if getattr(loop, 'is_running', False) and hasattr(loop, 'stop'):
+            loop.stop()
+        stdout.write('Live transcription stopped.\n')
 
 
 if __name__ == '__main__':

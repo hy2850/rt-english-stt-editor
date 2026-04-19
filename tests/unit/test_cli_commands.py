@@ -38,6 +38,22 @@ class FakeInjector:
         self.inserted.append(text)
 
 
+class FakeLiveLoop:
+    def __init__(self) -> None:
+        self.started = False
+        self.stopped = False
+
+    @property
+    def is_running(self) -> bool:
+        return self.started and not self.stopped
+
+    def start(self) -> None:
+        self.started = True
+
+    def stop(self) -> None:
+        self.stopped = True
+
+
 class FakeCapture:
     def __init__(self) -> None:
         self.started = False
@@ -60,6 +76,7 @@ class FakeRuntime:
     anchor_service: object
     injector: object
     microphone_capture: object
+    live_loop: object
 
 
 class CLICommandTests(unittest.TestCase):
@@ -79,6 +96,7 @@ class CLICommandTests(unittest.TestCase):
             anchor_service=FakeAnchorService(self.anchor),
             injector=FakeInjector(),
             microphone_capture=FakeCapture(),
+            live_loop=FakeLiveLoop(),
         )
 
     def test_check_permissions_command_reports_both_permissions(self) -> None:
@@ -135,6 +153,21 @@ class CLICommandTests(unittest.TestCase):
         self.assertTrue(self.runtime.microphone_capture.started)
         self.assertTrue(self.runtime.microphone_capture.stopped)
         self.assertIn('capture started', stdout.getvalue().lower())
+
+    def test_start_command_starts_live_transcription_loop(self) -> None:
+        stdout = io.StringIO()
+
+        exit_code = main(
+            ['start'],
+            stdout=stdout,
+            bootstrap_factory=lambda _config_path: self.runtime,
+            live_runner=lambda loop, _stdout: loop.stop(),
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(self.runtime.live_loop.started)
+        self.assertTrue(self.runtime.live_loop.stopped)
+        self.assertIn('listening for english speech', stdout.getvalue().lower())
 
 
 if __name__ == '__main__':

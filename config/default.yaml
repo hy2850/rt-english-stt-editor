@@ -13,7 +13,9 @@ audio:
   max_segment_sec: 12
 
 endpointing:
-  engine: simple
+  engine: energy
+  rms_threshold: 0.01
+  min_speech_ms: 250
   end_silence_ms: 700
 
 stt:

@@ -392,3 +392,7 @@ git commit -m "Document macOS injector and live capture workflow"
 - The armed target now persists in `.omx/runtime/active_anchor.json` so `arm-target` and `paste-demo` can run as separate CLI invocations.
 - The current injector implementation uses the existing optional AX hook but does not add a dedicated AX writer in this batch; the working macOS path is click + clipboard-preserving paste.
 - Core dependencies were added in `pyproject.toml` for YAML config loading, sounddevice capture, and macOS framework bindings.
+
+## Follow-up live STT loop completion
+
+- A follow-up branch added the `start` command for live English microphone capture, energy endpointing, STT warmup/transcription, cleanup, and injector delivery.

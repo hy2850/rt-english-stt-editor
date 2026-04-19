@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import queue
+import time
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Callable
@@ -60,10 +61,15 @@ class MicrophoneCapture:
             input_time = time_info.get('input_buffer_adc_time')
         elif time_info is not None:
             input_time = getattr(time_info, 'inputBufferAdcTime', None)
+        if input_time is None:
+            input_time = time.monotonic()
+
+        frames_payload = indata.copy() if hasattr(indata, 'copy') else indata
 
         chunk = {
-            'frames': indata,
+            'frames': frames_payload,
             'frame_count': frames,
+            'sample_rate': self.sample_rate,
             'input_time': input_time,
             'status': status,
         }
