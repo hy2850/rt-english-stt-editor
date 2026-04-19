@@ -1,90 +1,93 @@
 # Realtime STT Writer
 
-Local macOS MVP for turning spoken English into cleaned-up text and inserting it into a text editor at an armed target location.
+Local macOS MVP for turning spoken English into cleaned-up text and inserting it into the editor location under your mouse.
 
 ## What it does
 
 - Captures **English speech** from the microphone
-- Transcribes it with a pluggable STT boundary, starting with **`mlx-audio` + Cohere STT**
-- Cleans transcript text with:
-  - rule-based filler removal
-  - repetition collapse
-  - optional local LLM grammar correction
+- Detects finalized utterances with silence-based endpointing
+- Transcribes finalized audio with a pluggable STT boundary, starting with **`mlx-audio` + Cohere STT**
+- Cleans transcript text with deterministic rule-based cleanup
 - Formats finalized utterances for editor insertion
-- Targets a text editor location via a stored mouse/anchor concept
-- Inserts only **final sentences**, not noisy partial transcripts
+- Inserts text into a real macOS editor using click + clipboard-preserving paste
 
 ## Current project status
 
-This repository currently contains the **next local MVP slice**:
+This branch contains the first runnable local prototype slice:
 
-- domain models and protocols
-- cleanup pipeline and orchestrator core
-- macOS permission reporting
-- persistent target arming from the current mouse position
-- hybrid click + clipboard-preserving paste injection
+- macOS microphone/accessibility permission checks
+- automatic current-mouse target arming when the live loop starts
+- persistent target state under `.omx/runtime/active_anchor.json`
 - queue-based live microphone capture
-- CLI commands for manual local verification
-- unit tests for the current behavior
+- energy-based endpointing for finalized speech segments
+- live capture → endpointing → STT → cleanup → insertion loop
+- injector smoke tests through clipboard-preserving paste
+- unit tests for the implemented behavior
 
-The next batch is planned in:
+The active implementation plan is tracked in:
 
 - `docs/plans/2026-04-05-macos-injector-permissions-live-audio.md`
 
-## Planned user-facing MVP flow
+## Normal workflow
 
-1. Open a text editor such as **TextEdit** or **Obsidian**
-2. Move the mouse to the desired insertion point
-3. Arm that target
-4. Start listening
-5. Speak in English
-6. Let the app finalize the sentence, clean it up, and insert it into the editor
+There is one main command for the user-facing flow:
 
-## Features
+```bash
+python3 -m realtime_stt_writer.app.main start
+```
 
-- **Pluggable architecture**
-  - STT, cleanup, segmentation, and injection are separated behind interfaces
-- **Meaning-preserving cleanup**
-  - prioritizes removing fillers and fixing obvious grammar without rewriting intent
-- **Final-sentence insertion**
-  - avoids dumping unstable partial ASR output into the editor
-- **Hybrid macOS insertion direction**
-  - designed around click + clipboard-preserving paste, with room for AX-based optimization later
-- **Queue-oriented runtime design**
-  - intended to keep audio callbacks lightweight and push heavier work to workers/services
+Before running it:
+
+1. Open a text editor such as **TextEdit** or **Obsidian**.
+2. Move the mouse to the desired insertion point.
+3. Run `start`.
+4. Speak in English.
+5. The app finalizes utterances, transcribes them, cleans them up, and inserts final text into the editor.
+
+`start` performs the setup automatically: it reports required permissions, stops if any are missing, arms the current mouse target, warms the STT engine, starts microphone capture, and runs the live transcription loop.
+
+## Diagnostic commands
+
+These are for development and smoke testing, not the normal user flow:
+
+```bash
+python3 -m realtime_stt_writer.app.main --help
+python3 -m realtime_stt_writer.app.main start-capture
+python3 -m realtime_stt_writer.app.main paste-demo --text "Hello from the injector."
+```
+
+- `start-capture` opens raw microphone capture until `Ctrl-C`.
+- `paste-demo` inserts fixed text into the currently stored target and is useful for checking click + paste behavior.
+
+Setup-only steps are handled by `start` to keep the public workflow simple.
 
 ## Tech used
 
-### Current codebase
-
 - **Python 3.12**
 - **stdlib `unittest`**
-- **setuptools / `pyproject.toml` packaging**
-
-### Planned runtime integrations
-
+- **`sounddevice`** for microphone capture
 - **`mlx-audio`** for STT model loading and transcription
-- **`sounddevice`** for live microphone capture
 - **PyObjC / macOS frameworks**
   - `AppKit`
   - `Quartz`
   - `ApplicationServices`
-- optionally **`mlx-lm`** for local cleanup LLM behavior
+  - `AVFoundation`
+- **setuptools / `pyproject.toml` packaging**
 
 ## Project structure
 
 ```text
 realtime_stt_writer/
 ├─ app/        # CLI entrypoints and app bootstrap
-├─ audio/      # capture and segmentation services
-├─ cleanup/    # rule-based and LLM cleanup pipeline
+├─ audio/      # capture and endpointing services
+├─ cleanup/    # rule-based and future LLM cleanup pipeline
 ├─ domain/     # shared models and protocols
 ├─ inject/     # target arming and text insertion
-├─ services/   # orchestration
+├─ services/   # live loop and orchestration
 └─ stt/        # speech-to-text engine adapters
 ```
 
-## How to run
+## How to run locally
 
 ### 1. Use Python 3.12
 
@@ -92,7 +95,7 @@ realtime_stt_writer/
 python3 --version
 ```
 
-### 2. (Recommended) Create a virtual environment
+### 2. Create a virtual environment
 
 ```bash
 python3 -m venv .venv
@@ -105,16 +108,13 @@ source .venv/bin/activate
 python3 -m pip install -e .
 ```
 
-### 4. Run the current CLI workflow
+On macOS, grant the terminal app microphone and accessibility permissions when prompted or through System Settings.
+
+### 4. Run the live workflow
 
 ```bash
-python3 -m realtime_stt_writer.app.main --help
-python3 -m realtime_stt_writer.app.main paste-demo --text "Hello from the injector."
-python3 -m realtime_stt_writer.app.main start-capture
 python3 -m realtime_stt_writer.app.main start
 ```
-
-`start` checks permissions, arms the current mouse target, then runs the full live English capture → endpointing → STT → cleanup → insertion loop. `start-capture` is only a raw microphone diagnostic.
 
 ## How to run tests
 
@@ -145,15 +145,17 @@ Current config surface includes:
 
 ## Known limitations right now
 
-- Live STT now runs through the CLI `start` command, but still requires macOS permissions, microphone hardware, and the configured MLX STT model locally
-- No dedicated AX direct-text injector yet; the current prototype relies on click + paste fallback
-- No hotkey runtime yet
-- No menu bar app yet
-- Manual editor and microphone smoke checks still need to be run on macOS hardware
+- The live loop requires macOS permissions, microphone hardware, and the configured MLX STT model locally.
+- No dedicated AX direct-text injector yet; the current prototype relies on click + clipboard-preserving paste fallback.
+- No hotkey runtime yet.
+- No menu bar app yet.
+- Manual editor and microphone smoke checks still need to be run on macOS hardware.
 
 ## Development notes
 
-- This project is intentionally **local-first**
-- The architecture is designed so macOS integration details stay behind interfaces
-- The repository uses **test-first development** for behavior changes
-- Commits should follow the repo’s **Lore commit protocol**
+- This project is intentionally **local-first**.
+- Audio callbacks stay lightweight and only push frames into a queue.
+- Endpointing, STT, cleanup, and insertion run outside the audio callback.
+- macOS integration details stay behind interfaces.
+- The repository uses **test-first development** for behavior changes.
+- Commits should follow the repo’s **Lore commit protocol**.
