@@ -109,14 +109,12 @@ python3 -m pip install -e .
 
 ```bash
 python3 -m realtime_stt_writer.app.main --help
-python3 -m realtime_stt_writer.app.main check-permissions
-python3 -m realtime_stt_writer.app.main arm-target
 python3 -m realtime_stt_writer.app.main paste-demo --text "Hello from the injector."
 python3 -m realtime_stt_writer.app.main start-capture
 python3 -m realtime_stt_writer.app.main start
 ```
 
-`start-capture` keeps raw capture alive until `Ctrl-C`. Use `start` for the full live English capture → endpointing → STT → cleanup → insertion loop.
+`start` checks permissions, arms the current mouse target, then runs the full live English capture → endpointing → STT → cleanup → insertion loop. `start-capture` is only a raw microphone diagnostic.
 
 ## How to run tests
 

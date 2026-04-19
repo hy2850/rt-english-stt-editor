@@ -79,6 +79,12 @@ class FakeRuntime:
     live_loop: object
 
 
+def main_help_text() -> str:
+    from realtime_stt_writer.app.main import build_parser
+
+    return build_parser().format_help()
+
+
 class CLICommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.anchor = TargetAnchor(
@@ -91,7 +97,7 @@ class CLICommandTests(unittest.TestCase):
         self.runtime = FakeRuntime(
             permission_checkers=[
                 FakePermissionChecker('accessibility', True, 'Accessibility granted'),
-                FakePermissionChecker('microphone', False, 'Microphone missing'),
+                FakePermissionChecker('microphone', True, 'Microphone granted'),
             ],
             anchor_service=FakeAnchorService(self.anchor),
             injector=FakeInjector(),
@@ -99,32 +105,12 @@ class CLICommandTests(unittest.TestCase):
             live_loop=FakeLiveLoop(),
         )
 
-    def test_check_permissions_command_reports_both_permissions(self) -> None:
-        stdout = io.StringIO()
 
-        exit_code = main(
-            ['check-permissions'],
-            stdout=stdout,
-            bootstrap_factory=lambda _config_path: self.runtime,
-        )
+    def test_removed_setup_commands_are_not_public_cli_commands(self) -> None:
+        help_text = main_help_text()
 
-        output = stdout.getvalue().lower()
-        self.assertEqual(exit_code, 0)
-        self.assertIn('accessibility: granted', output)
-        self.assertIn('microphone: missing', output)
-
-    def test_arm_target_command_uses_anchor_service(self) -> None:
-        stdout = io.StringIO()
-
-        exit_code = main(
-            ['arm-target'],
-            stdout=stdout,
-            bootstrap_factory=lambda _config_path: self.runtime,
-        )
-
-        self.assertEqual(exit_code, 0)
-        self.assertEqual(self.runtime.anchor_service.arm_calls, 1)
-        self.assertIn('textedit', stdout.getvalue().lower())
+        self.assertNotIn('check-permissions', help_text)
+        self.assertNotIn('arm-target', help_text)
 
     def test_paste_demo_command_injects_requested_text(self) -> None:
         stdout = io.StringIO()
@@ -165,9 +151,33 @@ class CLICommandTests(unittest.TestCase):
         )
 
         self.assertEqual(exit_code, 0)
+        output = stdout.getvalue().lower()
+        self.assertEqual(self.runtime.anchor_service.arm_calls, 1)
         self.assertTrue(self.runtime.live_loop.started)
         self.assertTrue(self.runtime.live_loop.stopped)
-        self.assertIn('listening for english speech', stdout.getvalue().lower())
+        self.assertIn('accessibility: granted', output)
+        self.assertIn('microphone: granted', output)
+        self.assertIn('armed target', output)
+        self.assertIn('listening for english speech', output)
+
+    def test_start_exits_before_arming_when_permissions_are_missing(self) -> None:
+        stdout = io.StringIO()
+        self.runtime.permission_checkers = [
+            FakePermissionChecker('accessibility', False, 'Accessibility missing'),
+            FakePermissionChecker('microphone', True, 'Microphone granted'),
+        ]
+
+        exit_code = main(
+            ['start'],
+            stdout=stdout,
+            bootstrap_factory=lambda _config_path: self.runtime,
+            live_runner=lambda loop, _stdout: loop.stop(),
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(self.runtime.anchor_service.arm_calls, 0)
+        self.assertFalse(self.runtime.live_loop.started)
+        self.assertIn('cannot start until missing permissions', stdout.getvalue().lower())
 
 
 if __name__ == '__main__':

@@ -26,8 +26,6 @@ def build_parser() -> argparse.ArgumentParser:
         help='Path to YAML config',
     )
     subparsers = parser.add_subparsers(dest='command', required=True)
-    subparsers.add_parser('check-permissions', help='Report live macOS permission status')
-    subparsers.add_parser('arm-target', help='Arm the current mouse target for later paste injection')
     paste_demo = subparsers.add_parser('paste-demo', help='Inject demo text into the armed target')
     paste_demo.add_argument('--text', required=True, help='Text to insert into the armed target')
     subparsers.add_parser('start-capture', help='Start raw microphone capture until interrupted')
@@ -49,15 +47,6 @@ def main(
     out = stdout or sys.stdout
     runtime = bootstrap_factory(args.config)
 
-    if args.command == 'check-permissions':
-        statuses = [checker.check() for checker in runtime.permission_checkers]
-        out.write(_render_permission_statuses(statuses))
-        return 0
-
-    if args.command == 'arm-target':
-        anchor = runtime.anchor_service.arm_from_current_mouse_position()
-        out.write(f'Armed target: {_describe_anchor(anchor)}\n')
-        return 0
 
     if args.command == 'paste-demo':
         runtime.injector.insert(args.text)
@@ -72,6 +61,14 @@ def main(
         return 0
 
     if args.command == 'start':
+        statuses = [checker.check() for checker in runtime.permission_checkers]
+        out.write(_render_permission_statuses(statuses))
+        if any(not status['granted'] for status in statuses):
+            out.write('Cannot start until missing permissions are granted.\n')
+            return 1
+
+        anchor = runtime.anchor_service.arm_from_current_mouse_position()
+        out.write(f'Armed target: {_describe_anchor(anchor)}\n')
         runtime.live_loop.start()
         out.write('Listening for English speech. Press Ctrl-C to stop.\n')
         runner = live_runner or _run_live_session

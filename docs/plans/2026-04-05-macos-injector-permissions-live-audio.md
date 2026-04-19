@@ -396,3 +396,7 @@ git commit -m "Document macOS injector and live capture workflow"
 ## Follow-up live STT loop completion
 
 - A follow-up branch added the `start` command for live English microphone capture, energy endpointing, STT warmup/transcription, cleanup, and injector delivery.
+
+## CLI simplification follow-up
+
+- The standalone `check-permissions` and `arm-target` commands were removed from the public CLI; `start` now performs permission reporting and target arming automatically.
