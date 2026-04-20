@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -9,12 +10,15 @@ from typing import Callable
 class ClipboardPreservingPasteInjector:
     clipboard: object = field(default_factory=lambda: MacClipboard())
     send_paste: Callable[[], None] = field(default_factory=lambda: _send_command_v)
+    sleep_fn: Callable[[float], None] = field(default_factory=lambda: time.sleep)
+    paste_settle_delay_seconds: float = 0.2
 
     def insert(self, text: str) -> None:
         snapshot = self.clipboard.snapshot()
         self.clipboard.write_text(text)
         try:
             self.send_paste()
+            self.sleep_fn(self.paste_settle_delay_seconds)
         finally:
             self.clipboard.restore(snapshot)
 

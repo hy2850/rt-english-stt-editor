@@ -145,12 +145,14 @@ class MacClickerTests(unittest.TestCase):
 
 
 class ClipboardPreservingPasteInjectorTests(unittest.TestCase):
-    def test_restores_clipboard_after_paste(self) -> None:
+    def test_restores_clipboard_after_paste_event_has_time_to_complete(self) -> None:
         clipboard = RecordingClipboard()
-        send_paste_calls: list[str] = []
+        actions: list[tuple[str, object | None]] = []
         injector = ClipboardPreservingPasteInjector(
             clipboard=clipboard,
-            send_paste=lambda: send_paste_calls.append('paste-shortcut'),
+            send_paste=lambda: actions.append(('paste-shortcut', None)),
+            sleep_fn=lambda seconds: actions.append(('sleep', seconds)),
+            paste_settle_delay_seconds=0.2,
         )
 
         injector.insert('Hello')
@@ -163,7 +165,7 @@ class ClipboardPreservingPasteInjectorTests(unittest.TestCase):
                 ('restore', {'value': 'before'}),
             ],
         )
-        self.assertEqual(send_paste_calls, ['paste-shortcut'])
+        self.assertEqual(actions, [('paste-shortcut', None), ('sleep', 0.2)])
 
     def test_command_v_events_are_flagged_with_quartz_function(self) -> None:
         calls: list[tuple[str, object]] = []
