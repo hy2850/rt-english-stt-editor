@@ -155,13 +155,13 @@ class CLICommandTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         output = stdout.getvalue().lower()
-        self.assertEqual(self.runtime.anchor_service.arm_calls, 1)
+        self.assertEqual(self.runtime.anchor_service.arm_calls, 0)
         self.assertTrue(self.runtime.live_loop.started)
         self.assertTrue(self.runtime.live_loop.stopped)
         self.assertIn('accessibility: granted', output)
         self.assertIn('microphone: granted', output)
-        self.assertIn('armed target', output)
-        self.assertIn('warning: target appears to be dock', output)
+        self.assertIn('pointer target will be resolved for each insertion', output)
+        self.assertNotIn('armed target', output)
         self.assertIn('listening for english speech', output)
 
     def test_start_exits_before_arming_when_permissions_are_missing(self) -> None:

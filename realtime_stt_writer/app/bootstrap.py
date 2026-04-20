@@ -79,6 +79,7 @@ def build_runtime(config_path: str, *, stdout: TextIO | None = None) -> AppRunti
         anchor_service=anchor_service,
         clicker=MacClicker(),
         paste_injector=ClipboardPreservingPasteInjector(),
+        logger=runtime_logger,
     )
     microphone_capture = MicrophoneCapture(
         sample_rate=sample_rate,

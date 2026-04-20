@@ -16,8 +16,7 @@ Local macOS MVP for turning spoken English into cleaned-up text and inserting it
 This branch contains the first runnable local prototype slice:
 
 - macOS microphone/accessibility permission checks
-- automatic current-mouse target arming when the live loop starts
-- persistent target state under `.omx/runtime/active_anchor.json`
+- current-mouse target resolution immediately before each text insertion
 - queue-based live microphone capture
 - energy-based endpointing for finalized speech segments
 - live capture → endpointing → STT → cleanup → insertion loop
@@ -39,12 +38,12 @@ python3 -m realtime_stt_writer.app.main start
 Before running it:
 
 1. Open a text editor such as **TextEdit** or **Obsidian**.
-2. Move the mouse to the desired insertion point.
-3. Run `start`.
+2. Run `start`.
+3. Keep or move the mouse over the editor insertion point where the next finalized utterance should be inserted.
 4. Speak in English.
-5. The app finalizes utterances, transcribes them, cleans them up, and inserts final text into the editor.
+5. The app finalizes utterances, transcribes them, resolves the current mouse target, and inserts final text into that location.
 
-`start` performs the setup automatically: it reports required permissions, stops if any are missing, arms the current mouse target, warms the STT engine, starts microphone capture, and runs the live transcription loop.
+`start` performs the setup automatically: it reports required permissions, stops if any are missing, warms the STT engine, starts microphone capture, and runs the live transcription loop. The target is resolved again for every insertion, so moving the pointer during the session changes where the next text is inserted.
 
 ## Diagnostic commands
 
@@ -57,7 +56,7 @@ python3 -m realtime_stt_writer.app.main paste-demo --text "Hello from the inject
 ```
 
 - `start-capture` opens raw microphone capture until `Ctrl-C`.
-- `paste-demo` inserts fixed text into the currently stored target and is useful for checking click + paste behavior.
+- `paste-demo` inserts fixed text at the current mouse target and is useful for checking click + paste behavior.
 
 Setup-only steps are handled by `start` to keep the public workflow simple.
 

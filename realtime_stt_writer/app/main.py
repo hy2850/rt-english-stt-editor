@@ -67,11 +67,7 @@ def main(
             out.write('Cannot start until missing permissions are granted.\n')
             return 1
 
-        anchor = runtime.anchor_service.arm_from_current_mouse_position()
-        out.write(f'Armed target: {_describe_anchor(anchor)}\n')
-        warning = _target_warning(anchor)
-        if warning:
-            out.write(f'Warning: {warning}\n')
+        out.write('Pointer target will be resolved for each insertion; keep the mouse over the desired editor insertion point.\n')
         try:
             runtime.live_loop.start()
         except RuntimeError as exc:
@@ -107,16 +103,6 @@ def _describe_anchor(anchor: TargetAnchor | None) -> str:
     else:
         label = 'unknown app'
     return f'{label} at ({anchor.x:.1f}, {anchor.y:.1f})'
-
-
-def _target_warning(anchor: TargetAnchor | None) -> str:
-    if anchor is None:
-        return ''
-    app_name = (anchor.app_name or '').strip().lower()
-    bundle_id = (anchor.bundle_id or '').strip().lower()
-    if app_name == 'dock' or bundle_id == 'com.apple.dock':
-        return 'target appears to be Dock; move the mouse to a real editor insertion point before running start.'
-    return ''
 
 
 def _run_capture_session(capture: object, stdout: TextIO) -> None:

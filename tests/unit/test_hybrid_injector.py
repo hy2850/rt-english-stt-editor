@@ -34,6 +34,14 @@ class FakeAnchorService:
         return self._anchor
 
 
+class RecordingLogger:
+    def __init__(self) -> None:
+        self.lines: list[str] = []
+
+    def write(self, message: str) -> None:
+        self.lines.append(message)
+
+
 class RecordingClicker:
     def __init__(self) -> None:
         self.actions: list[tuple[str, object]] = []
@@ -118,11 +126,13 @@ class HybridInjectorTests(unittest.TestCase):
         anchor_service = FakeAnchorService(None, arm_results=[first, second])
         clicker = RecordingClicker()
         paste = RecordingPasteInjector()
+        logger = RecordingLogger()
         injector = HybridInjector(
             anchor_service=anchor_service,
             paste_injector=paste,
             clicker=clicker,
             sleep_fn=lambda _seconds: None,
+            logger=logger,
         )
 
         injector.insert('First')
@@ -131,6 +141,8 @@ class HybridInjectorTests(unittest.TestCase):
         self.assertEqual(anchor_service.arm_calls, 2)
         self.assertEqual(clicker.actions, [('click', (10.0, 20.0)), ('click', (30.0, 40.0))])
         self.assertEqual(paste.actions, [('paste', 'First'), ('paste', 'Second')])
+        self.assertIn('[target] current pointer target: unknown app at (10.0, 20.0)', logger.lines)
+        self.assertIn('[target] current pointer target: unknown app at (30.0, 40.0)', logger.lines)
 
     def test_clicks_before_paste_when_anchor_exists(self) -> None:
         actions: list[tuple[str, object]] = []
