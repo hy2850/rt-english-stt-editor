@@ -58,11 +58,12 @@ class MacOSTargetAnchorService:
 
 def _anchor_from_mapping(payload: Mapping[str, object]) -> TargetAnchor:
     return TargetAnchor(
-        x=float(payload['x']),
-        y=float(payload['y']),
+        x=float(payload['x']) if payload.get('x') is not None else None,
+        y=float(payload['y']) if payload.get('y') is not None else None,
         pid=int(payload['pid']) if payload.get('pid') is not None else None,
         bundle_id=str(payload['bundle_id']) if payload.get('bundle_id') is not None else None,
         app_name=str(payload['app_name']) if payload.get('app_name') is not None else None,
+        click_before_insert=bool(payload.get('click_before_insert', True)),
     )
 
 
@@ -106,26 +107,24 @@ def _resolve_focused_text_cursor() -> Mapping[str, object] | None:
     if focused_element is None:
         return None
     selected_range = _ax_copy_attribute(AXUIElementCopyAttributeValue, focused_element, kAXSelectedTextRangeAttribute)
-    if selected_range is None:
-        return None
-    bounds = _ax_copy_parameterized_attribute(
-        AXUIElementCopyParameterizedAttributeValue,
-        focused_element,
-        kAXBoundsForRangeParameterizedAttribute,
-        selected_range,
-    )
+    bounds = None
+    if selected_range is not None:
+        bounds = _ax_copy_parameterized_attribute(
+            AXUIElementCopyParameterizedAttributeValue,
+            focused_element,
+            kAXBoundsForRangeParameterizedAttribute,
+            selected_range,
+        )
     point = _rect_midpoint(bounds)
-    if point is None:
-        return None
-
     pid = _ax_pid(AXUIElementGetPid, focused_app)
     app = NSRunningApplication.runningApplicationWithProcessIdentifier_(pid) if pid is not None else None
     return {
-        'x': point[0],
-        'y': point[1],
+        'x': point[0] if point is not None else None,
+        'y': point[1] if point is not None else None,
         'pid': pid,
         'bundle_id': app.bundleIdentifier() if app is not None else None,
         'app_name': app.localizedName() if app is not None else None,
+        'click_before_insert': point is not None,
     }
 
 

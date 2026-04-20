@@ -75,7 +75,6 @@ class MacOSTargetAnchorServiceTests(unittest.TestCase):
             )
             self.assertEqual(service.get_active_anchor(), anchor)
 
-
     def test_prefers_focused_text_cursor_over_mouse_pointer(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state = TargetAnchorState(storage_path=Path(temp_dir) / 'anchor.json')
@@ -110,6 +109,30 @@ class MacOSTargetAnchorServiceTests(unittest.TestCase):
                 ),
             )
             self.assertEqual(pointer_calls, [])
+
+    def test_arms_focused_text_target_without_screen_bounds_for_direct_paste(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state = TargetAnchorState(storage_path=Path(temp_dir) / 'anchor.json')
+            service = MacOSTargetAnchorService(
+                state=state,
+                pointer_provider=lambda: (_ for _ in ()).throw(AssertionError('mouse pointer should not be used')),
+                target_resolver=lambda x, y: None,
+                insertion_cursor_provider=lambda: {
+                    'x': None,
+                    'y': None,
+                    'pid': 777,
+                    'bundle_id': 'md.obsidian',
+                    'app_name': 'Obsidian',
+                    'click_before_insert': False,
+                },
+            )
+
+            anchor = service.arm_from_current_mouse_position()
+
+            self.assertIsNone(anchor.x)
+            self.assertIsNone(anchor.y)
+            self.assertFalse(anchor.click_before_insert)
+            self.assertEqual(anchor.app_name, 'Obsidian')
 
     def test_refuses_to_arm_when_text_cursor_is_unavailable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

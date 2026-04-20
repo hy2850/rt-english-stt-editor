@@ -34,21 +34,23 @@ class Transcript:
 
 @dataclass(slots=True)
 class TargetAnchor:
-    x: float
-    y: float
+    x: float | None
+    y: float | None
     pid: int | None = None
     bundle_id: str | None = None
     app_name: str | None = None
+    click_before_insert: bool = True
 
-    def to_dict(self) -> dict[str, float | int | str | None]:
+    def to_dict(self) -> dict[str, float | int | str | bool | None]:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, object]) -> 'TargetAnchor':
         return cls(
-            x=float(payload['x']),
-            y=float(payload['y']),
+            x=float(payload['x']) if payload.get('x') is not None else None,
+            y=float(payload['y']) if payload.get('y') is not None else None,
             pid=int(payload['pid']) if payload.get('pid') is not None else None,
             bundle_id=str(payload['bundle_id']) if payload.get('bundle_id') is not None else None,
             app_name=str(payload['app_name']) if payload.get('app_name') is not None else None,
+            click_before_insert=bool(payload.get('click_before_insert', True)),
         )

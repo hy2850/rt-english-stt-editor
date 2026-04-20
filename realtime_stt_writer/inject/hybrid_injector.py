@@ -33,7 +33,7 @@ class HybridInjector:
                 self._advance_pointer(anchor)
                 return
 
-        if self.clicker is not None and hasattr(self.clicker, 'click'):
+        if _should_click(anchor) and self.clicker is not None and hasattr(self.clicker, 'click'):
             self.clicker.click(anchor.x, anchor.y)
             self.sleep_fn(self.post_click_delay_seconds)
 
@@ -41,7 +41,7 @@ class HybridInjector:
         self._advance_pointer(anchor)
 
     def _advance_pointer(self, anchor) -> None:
-        if self.clicker is not None and hasattr(self.clicker, 'move'):
+        if _should_click(anchor) and self.clicker is not None and hasattr(self.clicker, 'move'):
             next_y = anchor.y + self.pointer_line_step_px
             self.clicker.move(anchor.x, next_y)
             self._log(f'[target] advanced pointer to next line at ({anchor.x:.1f}, {next_y:.1f})')
@@ -49,6 +49,10 @@ class HybridInjector:
     def _log(self, message: str) -> None:
         if self.logger is not None:
             self.logger.write(message)
+
+
+def _should_click(anchor) -> bool:
+    return bool(getattr(anchor, 'click_before_insert', True) and anchor.x is not None and anchor.y is not None)
 
 
 def _describe_anchor(anchor) -> str:
@@ -60,4 +64,6 @@ def _describe_anchor(anchor) -> str:
         label = f'pid={anchor.pid}'
     else:
         label = 'unknown app'
+    if anchor.x is None or anchor.y is None:
+        return f'{label} at focused text cursor'
     return f'{label} at ({anchor.x:.1f}, {anchor.y:.1f})'

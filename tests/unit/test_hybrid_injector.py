@@ -168,6 +168,28 @@ class HybridInjectorTests(unittest.TestCase):
         self.assertEqual(clicker.actions, [('click', (10.0, 20.0)), ('move', (10.0, 44.0)), ('click', (30.0, 40.0)), ('move', (30.0, 64.0))])
         self.assertEqual(paste.actions, [('paste', 'First'), ('paste', 'Second')])
 
+    def test_pastes_without_click_when_focused_text_target_has_no_screen_bounds(self) -> None:
+        anchor = TargetAnchor(
+            x=None,
+            y=None,
+            pid=777,
+            bundle_id='md.obsidian',
+            app_name='Obsidian',
+            click_before_insert=False,
+        )
+        clicker = RecordingClicker()
+        paste = RecordingPasteInjector()
+        injector = HybridInjector(
+            anchor_service=FakeAnchorService(anchor),
+            paste_injector=paste,
+            clicker=clicker,
+        )
+
+        injector.insert('Hello')
+
+        self.assertEqual(clicker.actions, [])
+        self.assertEqual(paste.actions, [('paste', 'Hello')])
+
     def test_clicks_before_paste_when_anchor_exists(self) -> None:
         actions: list[tuple[str, object]] = []
         clicker = RecordingClicker()
@@ -187,7 +209,6 @@ class HybridInjectorTests(unittest.TestCase):
 
         self.assertEqual(actions, [('click', (10.0, 20.0)), ('move', (10.0, 44.0)), ('paste', 'Hello')])
         self.assertEqual(sleep_calls, [0.2])
-
 
     def test_moves_pointer_to_next_line_after_paste(self) -> None:
         actions: list[tuple[str, object]] = []
@@ -286,7 +307,6 @@ class MacClickerTests(unittest.TestCase):
                 ({'event_type': 'up', 'point': (10.0, 20.0), 'button': 'left'}, 'click-state', 1),
             ],
         )
-
 
     def test_move_posts_mouse_move_event(self) -> None:
         clicker = MacClicker(
