@@ -63,7 +63,11 @@ class AppOrchestrator:
             self._log(f'[insert] {segment.segment_id} duplicate or empty formatted text; skipped')
             return
 
-        self.injector.insert(formatted)
+        try:
+            self.injector.insert(formatted)
+        except RuntimeError as exc:
+            self._log(f'[insert] {segment.segment_id} failed: {exc}')
+            return
         self._log(f'[insert] {segment.segment_id} inserted: {formatted.strip()}')
         self.previous_sentences.append(cleaned)
         self.previous_sentences = self.previous_sentences[-10:]

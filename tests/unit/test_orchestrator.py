@@ -38,6 +38,11 @@ class RecordingLogger:
         self.lines.append(message)
 
 
+class FailingInjector:
+    def insert(self, text: str) -> None:
+        raise RuntimeError('Unable to resolve the focused text cursor')
+
+
 class RecordingInjector:
     def __init__(self) -> None:
         self.inserted: list[str] = []
@@ -70,6 +75,32 @@ class AppOrchestratorTests(unittest.TestCase):
         self.assertEqual(injector.inserted, ["I want ask about the homework.\n"])
         self.assertIn('[stt] seg-1 raw: um I want ask about the homework', logger.lines)
         self.assertIn('[insert] seg-1 inserted: I want ask about the homework.', logger.lines)
+
+
+    def test_logs_insertion_failures_without_crashing_worker(self) -> None:
+        logger = RecordingLogger()
+        orchestrator = AppOrchestrator(
+            stt_engine=FakeSTTEngine("hello there"),
+            cleanup_pipeline=CleanupPipeline(rule_engine=RuleBasedCleanup()),
+            injector=FailingInjector(),
+            logger=logger,
+        )
+
+        orchestrator.on_finalized_segment(
+            FinalizedSegment(
+                audio=[0.1],
+                sample_rate=16000,
+                started_at=1.0,
+                ended_at=2.0,
+                segment_id="seg-fail",
+            )
+        )
+
+        self.assertIn(
+            '[insert] seg-fail failed: Unable to resolve the focused text cursor',
+            logger.lines,
+        )
+        self.assertIsNone(orchestrator.last_inserted_segment_id)
 
     def test_skips_duplicate_segment_ids(self) -> None:
         injector = RecordingInjector()
