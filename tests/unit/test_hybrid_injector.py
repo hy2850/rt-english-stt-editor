@@ -9,11 +9,23 @@ from realtime_stt_writer.inject.mac_paste import write_text_to_pasteboard
 
 
 class FakeAnchorService:
-    def __init__(self, anchor: TargetAnchor | None) -> None:
+    def __init__(self, anchor: TargetAnchor | None, *, arm_results: list[TargetAnchor | None] | None = None) -> None:
         self._anchor = anchor
+        self.arm_results = list(arm_results or [])
+        self.arm_calls = 0
 
     def arm_from_current_mouse_position(self) -> TargetAnchor:
-        raise NotImplementedError
+        self.arm_calls += 1
+        if self.arm_results:
+            next_anchor = self.arm_results.pop(0)
+            if next_anchor is None:
+                self._anchor = None
+                raise RuntimeError('Target is not armed')
+            self._anchor = next_anchor
+            return next_anchor
+        if self._anchor is None:
+            raise RuntimeError('Target is not armed')
+        return self._anchor
 
     def set_active_anchor(self, anchor: TargetAnchor) -> None:
         self._anchor = anchor
@@ -99,6 +111,26 @@ class HybridInjectorTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, 'armed'):
             injector.insert('Hello')
+
+    def test_rearms_from_current_mouse_position_for_each_insert(self) -> None:
+        first = TargetAnchor(x=10.0, y=20.0)
+        second = TargetAnchor(x=30.0, y=40.0)
+        anchor_service = FakeAnchorService(None, arm_results=[first, second])
+        clicker = RecordingClicker()
+        paste = RecordingPasteInjector()
+        injector = HybridInjector(
+            anchor_service=anchor_service,
+            paste_injector=paste,
+            clicker=clicker,
+            sleep_fn=lambda _seconds: None,
+        )
+
+        injector.insert('First')
+        injector.insert('Second')
+
+        self.assertEqual(anchor_service.arm_calls, 2)
+        self.assertEqual(clicker.actions, [('click', (10.0, 20.0)), ('click', (30.0, 40.0))])
+        self.assertEqual(paste.actions, [('paste', 'First'), ('paste', 'Second')])
 
     def test_clicks_before_paste_when_anchor_exists(self) -> None:
         actions: list[tuple[str, object]] = []

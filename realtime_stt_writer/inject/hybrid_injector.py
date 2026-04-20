@@ -18,9 +18,7 @@ class HybridInjector:
     sleep_fn: Callable[[float], None] = field(default_factory=lambda: time.sleep)
 
     def insert(self, text: str) -> None:
-        anchor = self.anchor_service.get_active_anchor()
-        if anchor is None:
-            raise RuntimeError('Target is not armed')
+        anchor = self.anchor_service.arm_from_current_mouse_position()
 
         if self.ax_injector is not None and hasattr(self.ax_injector, 'try_insert'):
             if self.ax_injector.try_insert(text, anchor):
