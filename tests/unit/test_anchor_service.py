@@ -7,6 +7,7 @@ from realtime_stt_writer.inject.anchor import MacOSTargetAnchorService
 from realtime_stt_writer.inject.anchor import _ax_copy_attribute
 from realtime_stt_writer.inject.anchor import _ax_copy_parameterized_attribute
 from realtime_stt_writer.inject.anchor import _build_focus_target
+from realtime_stt_writer.inject.anchor import _frontmost_application_target_from_workspace
 from realtime_stt_writer.inject.anchor import TargetAnchorState
 
 
@@ -49,6 +50,35 @@ class AccessibilityHelperTests(unittest.TestCase):
                 'x': None,
                 'y': None,
                 'pid': 123,
+                'bundle_id': 'md.obsidian',
+                'app_name': 'Obsidian',
+                'click_before_insert': False,
+            },
+        )
+
+    def test_frontmost_application_target_is_direct_paste_without_mouse_coordinates(self) -> None:
+        class App:
+            def processIdentifier(self):
+                return 42
+
+            def bundleIdentifier(self):
+                return 'md.obsidian'
+
+            def localizedName(self):
+                return 'Obsidian'
+
+        class Workspace:
+            def frontmostApplication(self):
+                return App()
+
+        target = _frontmost_application_target_from_workspace(Workspace())
+
+        self.assertEqual(
+            target,
+            {
+                'x': None,
+                'y': None,
+                'pid': 42,
                 'bundle_id': 'md.obsidian',
                 'app_name': 'Obsidian',
                 'click_before_insert': False,

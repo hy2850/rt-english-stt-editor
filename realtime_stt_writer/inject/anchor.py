@@ -87,6 +87,11 @@ def _resolve_focused_text_cursor() -> Mapping[str, object] | None:
         return None
 
     try:
+        from AppKit import NSRunningApplication
+    except ImportError:
+        return None
+
+    try:
         from ApplicationServices import AXUIElementCopyAttributeValue
         from ApplicationServices import AXUIElementCopyParameterizedAttributeValue
         from ApplicationServices import AXUIElementCreateSystemWide
@@ -95,17 +100,22 @@ def _resolve_focused_text_cursor() -> Mapping[str, object] | None:
         from ApplicationServices import kAXFocusedApplicationAttribute
         from ApplicationServices import kAXFocusedUIElementAttribute
         from ApplicationServices import kAXSelectedTextRangeAttribute
-        from AppKit import NSRunningApplication
     except ImportError:
-        return None
+        return _frontmost_application_target()
 
     system_wide = AXUIElementCreateSystemWide()
     focused_app = _ax_copy_attribute(AXUIElementCopyAttributeValue, system_wide, kAXFocusedApplicationAttribute)
     if focused_app is None:
-        return None
+        return _frontmost_application_target()
+
     focused_element = _ax_copy_attribute(AXUIElementCopyAttributeValue, focused_app, kAXFocusedUIElementAttribute)
     if focused_element is None:
-        return None
+        pid = _ax_pid(AXUIElementGetPid, focused_app)
+        app = NSRunningApplication.runningApplicationWithProcessIdentifier_(pid) if pid is not None else None
+        if app is not None:
+            return _build_focus_target(pid=pid, app=app, point=None)
+        return _frontmost_application_target()
+
     selected_range = _ax_copy_attribute(AXUIElementCopyAttributeValue, focused_element, kAXSelectedTextRangeAttribute)
     bounds = None
     if selected_range is not None:
@@ -130,6 +140,25 @@ def _build_focus_target(*, pid: int | None, app, point: tuple[float, float] | No
         'app_name': app.localizedName() if app is not None else None,
         'click_before_insert': point is not None,
     }
+
+
+def _frontmost_application_target() -> Mapping[str, object] | None:
+    try:
+        from AppKit import NSWorkspace
+    except ImportError:
+        return None
+    return _frontmost_application_target_from_workspace(NSWorkspace.sharedWorkspace())
+
+
+def _frontmost_application_target_from_workspace(workspace) -> Mapping[str, object] | None:
+    app = workspace.frontmostApplication()
+    if app is None:
+        return None
+    try:
+        pid = int(app.processIdentifier())
+    except Exception:
+        pid = None
+    return _build_focus_target(pid=pid, app=app, point=None)
 
 
 def _ax_copy_attribute(copy_attribute, element, attribute):
