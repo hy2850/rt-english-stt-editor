@@ -19,7 +19,7 @@ class HybridInjector:
     paste_injector: object
     clicker: object | None = None
     ax_injector: object | None = None
-    post_click_delay_seconds: float = 0.05
+    post_click_delay_seconds: float = 0.2
     sleep_fn: Callable[[float], None] = field(default_factory=lambda: time.sleep)
     logger: RuntimeLogger | None = None
 

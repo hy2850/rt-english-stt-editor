@@ -3,6 +3,7 @@ import unittest
 from realtime_stt_writer.domain.models import TargetAnchor
 from realtime_stt_writer.inject.hybrid_injector import HybridInjector
 from realtime_stt_writer.inject.mac_click import MacClicker
+from realtime_stt_writer.inject.mac_click import build_click_events
 from realtime_stt_writer.inject.mac_paste import ClipboardPreservingPasteInjector
 from realtime_stt_writer.inject.mac_paste import post_command_v_events
 from realtime_stt_writer.inject.mac_paste import write_text_to_pasteboard
@@ -162,7 +163,7 @@ class HybridInjectorTests(unittest.TestCase):
         actions.extend(paste.actions)
 
         self.assertEqual(actions, [('click', (10.0, 20.0)), ('paste', 'Hello')])
-        self.assertEqual(sleep_calls, [0.05])
+        self.assertEqual(sleep_calls, [0.2])
 
     def test_uses_ax_direct_insert_only_when_it_succeeds(self) -> None:
         clicker = RecordingClicker()
@@ -203,6 +204,39 @@ class HybridInjectorTests(unittest.TestCase):
 
 
 class MacClickerTests(unittest.TestCase):
+    def test_build_click_events_moves_then_marks_down_and_up_as_a_click(self) -> None:
+        flag_calls: list[tuple[object, object, object]] = []
+
+        def create_mouse_event(_source, event_type, point, button):
+            return {'event_type': event_type, 'point': point, 'button': button}
+
+        events = build_click_events(
+            10.0,
+            20.0,
+            point_factory=lambda x, y: (x, y),
+            create_mouse_event=create_mouse_event,
+            set_integer_field=lambda event, field, value: flag_calls.append((event.copy(), field, value)),
+            event_types={'move': 'move', 'down': 'down', 'up': 'up'},
+            button='left',
+            click_state_field='click-state',
+        )
+
+        self.assertEqual(
+            events,
+            [
+                {'event_type': 'move', 'point': (10.0, 20.0), 'button': 'left'},
+                {'event_type': 'down', 'point': (10.0, 20.0), 'button': 'left'},
+                {'event_type': 'up', 'point': (10.0, 20.0), 'button': 'left'},
+            ],
+        )
+        self.assertEqual(
+            flag_calls,
+            [
+                ({'event_type': 'down', 'point': (10.0, 20.0), 'button': 'left'}, 'click-state', 1),
+                ({'event_type': 'up', 'point': (10.0, 20.0), 'button': 'left'}, 'click-state', 1),
+            ],
+        )
+
     def test_posts_all_generated_mouse_events(self) -> None:
         posted: list[str] = []
         clicker = MacClicker(
