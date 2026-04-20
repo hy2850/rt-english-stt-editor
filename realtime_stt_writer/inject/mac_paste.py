@@ -5,6 +5,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
+PASTEBOARD_TEXT_TYPE = 'public.utf8-plain-text'
+
 
 @dataclass(slots=True)
 class ClipboardPreservingPasteInjector:
@@ -15,8 +17,8 @@ class ClipboardPreservingPasteInjector:
 
     def insert(self, text: str) -> None:
         snapshot = self.clipboard.snapshot()
-        self.clipboard.write_text(text)
         try:
+            self.clipboard.write_text(text)
             self.send_paste()
             self.sleep_fn(self.paste_settle_delay_seconds)
         finally:
@@ -38,9 +40,10 @@ class MacClipboard:
         return snapshot
 
     def write_text(self, text: str) -> None:
-        pasteboard = _general_pasteboard()
-        pasteboard.clearContents()
-        pasteboard.setString_forType_(text, 'public.utf8-plain-text')
+        write_text_to_pasteboard(_general_pasteboard(), text, pasteboard_type=PASTEBOARD_TEXT_TYPE)
+
+    def read_text(self) -> str:
+        return read_text_from_pasteboard(_general_pasteboard(), pasteboard_type=PASTEBOARD_TEXT_TYPE)
 
     def restore(self, snapshot: list[dict[str, bytes]]) -> None:
         pasteboard = _general_pasteboard()
@@ -61,6 +64,23 @@ class MacClipboard:
                 item.setData_forType_(NSData.dataWithBytes_length_(payload, len(payload)), data_type)
             items.append(item)
         pasteboard.writeObjects_(items)
+
+
+def write_text_to_pasteboard(pasteboard, text: str, *, pasteboard_type: str = PASTEBOARD_TEXT_TYPE) -> None:
+    pasteboard.clearContents()
+    if hasattr(pasteboard, 'declareTypes_owner_'):
+        pasteboard.declareTypes_owner_([pasteboard_type], None)
+    succeeded = bool(pasteboard.setString_forType_(text, pasteboard_type))
+    observed = read_text_from_pasteboard(pasteboard, pasteboard_type=pasteboard_type)
+    if not succeeded or observed != text:
+        raise RuntimeError('Failed to write text to clipboard for paste injection')
+
+
+def read_text_from_pasteboard(pasteboard, *, pasteboard_type: str = PASTEBOARD_TEXT_TYPE) -> str:
+    if not hasattr(pasteboard, 'stringForType_'):
+        return ''
+    value = pasteboard.stringForType_(pasteboard_type)
+    return str(value) if value is not None else ''
 
 
 def _general_pasteboard():

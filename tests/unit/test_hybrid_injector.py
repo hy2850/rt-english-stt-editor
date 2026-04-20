@@ -5,6 +5,7 @@ from realtime_stt_writer.inject.hybrid_injector import HybridInjector
 from realtime_stt_writer.inject.mac_click import MacClicker
 from realtime_stt_writer.inject.mac_paste import ClipboardPreservingPasteInjector
 from realtime_stt_writer.inject.mac_paste import post_command_v_events
+from realtime_stt_writer.inject.mac_paste import write_text_to_pasteboard
 
 
 class FakeAnchorService:
@@ -58,8 +59,34 @@ class RecordingClipboard:
     def write_text(self, text: str) -> None:
         self.actions.append(('write_text', text))
 
+    def read_text(self) -> str:
+        return next((value for action, value in reversed(self.actions) if action == 'write_text'), '')
+
     def restore(self, snapshot: object) -> None:
         self.actions.append(('restore', snapshot))
+
+
+class FakePasteboard:
+    def __init__(self, *, set_result: bool = True, stored_text: str | None = None) -> None:
+        self.set_result = set_result
+        self.stored_text = stored_text
+        self.calls: list[tuple[str, object]] = []
+
+    def clearContents(self) -> None:
+        self.calls.append(('clearContents', None))
+
+    def declareTypes_owner_(self, types, owner) -> None:
+        self.calls.append(('declareTypes_owner_', list(types)))
+
+    def setString_forType_(self, text: str, pasteboard_type: str) -> bool:
+        self.calls.append(('setString_forType_', (text, pasteboard_type)))
+        if self.set_result:
+            self.stored_text = text
+        return self.set_result
+
+    def stringForType_(self, pasteboard_type: str) -> str | None:
+        self.calls.append(('stringForType_', pasteboard_type))
+        return self.stored_text
 
 
 class HybridInjectorTests(unittest.TestCase):
@@ -145,6 +172,27 @@ class MacClickerTests(unittest.TestCase):
 
 
 class ClipboardPreservingPasteInjectorTests(unittest.TestCase):
+    def test_write_text_to_pasteboard_declares_string_type_and_verifies_readback(self) -> None:
+        pasteboard = FakePasteboard()
+
+        write_text_to_pasteboard(pasteboard, 'new transcript', pasteboard_type='public.utf8-plain-text')
+
+        self.assertEqual(
+            pasteboard.calls,
+            [
+                ('clearContents', None),
+                ('declareTypes_owner_', ['public.utf8-plain-text']),
+                ('setString_forType_', ('new transcript', 'public.utf8-plain-text')),
+                ('stringForType_', 'public.utf8-plain-text'),
+            ],
+        )
+
+    def test_write_text_to_pasteboard_raises_when_text_cannot_be_verified(self) -> None:
+        pasteboard = FakePasteboard(set_result=False, stored_text='old content')
+
+        with self.assertRaisesRegex(RuntimeError, 'Failed to write text to clipboard'):
+            write_text_to_pasteboard(pasteboard, 'new transcript', pasteboard_type='public.utf8-plain-text')
+
     def test_restores_clipboard_after_paste_event_has_time_to_complete(self) -> None:
         clipboard = RecordingClipboard()
         actions: list[tuple[str, object | None]] = []
@@ -166,6 +214,31 @@ class ClipboardPreservingPasteInjectorTests(unittest.TestCase):
             ],
         )
         self.assertEqual(actions, [('paste-shortcut', None), ('sleep', 0.2)])
+
+    def test_restores_clipboard_when_write_text_fails(self) -> None:
+        class FailingClipboard(RecordingClipboard):
+            def write_text(self, text: str) -> None:
+                self.actions.append(('write_text', text))
+                raise RuntimeError('write failed')
+
+        clipboard = FailingClipboard()
+        injector = ClipboardPreservingPasteInjector(
+            clipboard=clipboard,
+            send_paste=lambda: None,
+            sleep_fn=lambda _seconds: None,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, 'write failed'):
+            injector.insert('Hello')
+
+        self.assertEqual(
+            clipboard.actions,
+            [
+                ('snapshot', None),
+                ('write_text', 'Hello'),
+                ('restore', {'value': 'before'}),
+            ],
+        )
 
     def test_command_v_events_are_flagged_with_quartz_function(self) -> None:
         calls: list[tuple[str, object]] = []
