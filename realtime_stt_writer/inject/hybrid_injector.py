@@ -22,10 +22,9 @@ class HybridInjector:
     post_click_delay_seconds: float = 0.2
     sleep_fn: Callable[[float], None] = field(default_factory=lambda: time.sleep)
     logger: RuntimeLogger | None = None
-    target_override: object | None = None
 
     def insert(self, text: str) -> None:
-        anchor = self.target_override or self.anchor_service.arm_from_current_mouse_position()
+        anchor = self.anchor_service.arm_from_current_mouse_position()
         self._log(f'[target] current pointer target: {_describe_anchor(anchor)}')
 
         if self.ax_injector is not None and hasattr(self.ax_injector, 'try_insert'):
@@ -37,10 +36,6 @@ class HybridInjector:
             self.sleep_fn(self.post_click_delay_seconds)
 
         self.paste_injector.insert(text)
-
-    def set_target_override(self, anchor) -> None:
-        self.target_override = anchor
-        self._log(f'[target] updated insertion target: {_describe_anchor(anchor)}')
 
     def _log(self, message: str) -> None:
         if self.logger is not None:

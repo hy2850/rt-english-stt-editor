@@ -110,9 +110,7 @@ def _describe_anchor(anchor: TargetAnchor | None) -> str:
 
 def _refresh_pointer_target(runtime, stdout: TextIO) -> None:
     anchor = runtime.anchor_service.arm_from_current_mouse_position()
-    if hasattr(runtime.injector, 'set_target_override'):
-        runtime.injector.set_target_override(anchor)
-    stdout.write(f'Updated insertion target: {_describe_anchor(anchor)}\n')
+    stdout.write(f'Current pointer target: {_describe_anchor(anchor)}\n')
 
 
 def _stdin_enter_pressed(stdin, *, timeout_seconds: float) -> bool:

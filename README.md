@@ -40,11 +40,11 @@ Before running it:
 1. Open a text editor such as **TextEdit** or **Obsidian**.
 2. Run `start`.
 3. Keep or move the mouse over the editor insertion point where the next finalized utterance should be inserted.
-4. Optional: press **Enter** while the program is running to lock/update the insertion target to the current pointer location. Press Enter again after moving the pointer to update it.
+4. Optional: press **Enter** while the program is running to print the current pointer target for diagnostics.
 5. Speak in English.
-6. The app finalizes utterances, transcribes them, resolves the current mouse target or the last Enter-updated target, and inserts final text into that location.
+6. The app finalizes utterances, transcribes them, resolves the current mouse target immediately before insertion, and inserts final text into that location.
 
-`start` performs the setup automatically: it reports required permissions, stops if any are missing, warms the STT engine, starts microphone capture, and runs the live transcription loop. If you do not press Enter, the target is resolved again for every insertion, so moving the pointer during the session changes where the next text is inserted.
+`start` performs the setup automatically: it reports required permissions, stops if any are missing, warms the STT engine, starts microphone capture, and runs the live transcription loop. The target is resolved again for every insertion, so moving the pointer during the session changes where the next text is inserted; pressing Enter only prints the current target for diagnostics.
 
 ## Diagnostic commands
 
