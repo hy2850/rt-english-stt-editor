@@ -33,9 +33,13 @@ class FakeAnchorService:
 class FakeInjector:
     def __init__(self) -> None:
         self.inserted: list[str] = []
+        self.overrides: list[TargetAnchor] = []
 
     def insert(self, text: str) -> None:
         self.inserted.append(text)
+
+    def set_target_override(self, anchor: TargetAnchor) -> None:
+        self.overrides.append(anchor)
 
 
 class FakeLiveLoop:
@@ -161,6 +165,7 @@ class CLICommandTests(unittest.TestCase):
         self.assertIn('accessibility: granted', output)
         self.assertIn('microphone: granted', output)
         self.assertIn('pointer target will be resolved for each insertion', output)
+        self.assertIn('press enter to update', output)
         self.assertNotIn('armed target', output)
         self.assertIn('listening for english speech', output)
 
@@ -197,6 +202,17 @@ class CLICommandTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn('cannot start live transcription', stdout.getvalue().lower())
         self.assertIn('mlx-audio is required', stdout.getvalue().lower())
+
+    def test_refresh_pointer_target_updates_injector_override(self) -> None:
+        from realtime_stt_writer.app.main import _refresh_pointer_target
+
+        stdout = io.StringIO()
+
+        _refresh_pointer_target(self.runtime, stdout)
+
+        self.assertEqual(self.runtime.anchor_service.arm_calls, 1)
+        self.assertEqual(self.runtime.injector.overrides, [self.anchor])
+        self.assertIn('updated insertion target', stdout.getvalue().lower())
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import select
 import sys
 import time
 from typing import Callable
@@ -67,15 +68,17 @@ def main(
             out.write('Cannot start until missing permissions are granted.\n')
             return 1
 
-        out.write('Pointer target will be resolved for each insertion; keep the mouse over the desired editor insertion point.\n')
+        out.write('Pointer target will be resolved for each insertion; keep the mouse over the desired editor insertion point. Press Enter to update the insertion target manually.\n')
         try:
             runtime.live_loop.start()
         except RuntimeError as exc:
             out.write(f'Cannot start live transcription: {exc}\n')
             return 1
         out.write('Listening for English speech. Press Ctrl-C to stop.\n')
-        runner = live_runner or _run_live_session
-        runner(runtime.live_loop, out)
+        if live_runner is not None:
+            live_runner(runtime.live_loop, out)
+        else:
+            _run_live_session(runtime.live_loop, out, target_refresher=lambda: _refresh_pointer_target(runtime, out))
         return 0
 
     out.write(f"Command '{args.command}' is not wired yet.\n")
@@ -105,6 +108,25 @@ def _describe_anchor(anchor: TargetAnchor | None) -> str:
     return f'{label} at ({anchor.x:.1f}, {anchor.y:.1f})'
 
 
+def _refresh_pointer_target(runtime, stdout: TextIO) -> None:
+    anchor = runtime.anchor_service.arm_from_current_mouse_position()
+    if hasattr(runtime.injector, 'set_target_override'):
+        runtime.injector.set_target_override(anchor)
+    stdout.write(f'Updated insertion target: {_describe_anchor(anchor)}\n')
+
+
+def _stdin_enter_pressed(stdin, *, timeout_seconds: float) -> bool:
+    if stdin is None:
+        return False
+    try:
+        ready, _, _ = select.select([stdin], [], [], timeout_seconds)
+    except (OSError, ValueError):
+        return False
+    if not ready:
+        return False
+    return stdin.readline() == '\n'
+
+
 def _run_capture_session(capture: object, stdout: TextIO) -> None:
     try:
         while getattr(capture, 'is_running', False):
@@ -117,13 +139,17 @@ def _run_capture_session(capture: object, stdout: TextIO) -> None:
         stdout.write('Capture stopped.\n')
 
 
-def _run_live_session(loop: object, stdout: TextIO) -> None:
+def _run_live_session(loop: object, stdout: TextIO, *, target_refresher=None, stdin=None) -> None:
+    input_stream = stdin if stdin is not None else sys.stdin
     try:
-        if hasattr(loop, 'run_until_interrupted'):
-            loop.run_until_interrupted()
-        else:
-            while getattr(loop, 'is_running', False):
-                time.sleep(0.25)
+        while getattr(loop, 'is_running', False):
+            if target_refresher is not None and _stdin_enter_pressed(input_stream, timeout_seconds=0.25):
+                try:
+                    target_refresher()
+                except RuntimeError as exc:
+                    stdout.write(f'Could not update insertion target: {exc}\n')
+            else:
+                time.sleep(0.05)
     except KeyboardInterrupt:
         pass
     finally:

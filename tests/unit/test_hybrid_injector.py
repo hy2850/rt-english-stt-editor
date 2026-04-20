@@ -145,6 +145,28 @@ class HybridInjectorTests(unittest.TestCase):
         self.assertIn('[target] current pointer target: unknown app at (10.0, 20.0)', logger.lines)
         self.assertIn('[target] current pointer target: unknown app at (30.0, 40.0)', logger.lines)
 
+    def test_manual_target_override_is_used_until_updated(self) -> None:
+        first = TargetAnchor(x=10.0, y=20.0)
+        second = TargetAnchor(x=30.0, y=40.0)
+        anchor_service = FakeAnchorService(None, arm_results=[TargetAnchor(x=99.0, y=99.0)])
+        clicker = RecordingClicker()
+        paste = RecordingPasteInjector()
+        injector = HybridInjector(
+            anchor_service=anchor_service,
+            paste_injector=paste,
+            clicker=clicker,
+            sleep_fn=lambda _seconds: None,
+        )
+
+        injector.set_target_override(first)
+        injector.insert('First')
+        injector.set_target_override(second)
+        injector.insert('Second')
+
+        self.assertEqual(anchor_service.arm_calls, 0)
+        self.assertEqual(clicker.actions, [('click', (10.0, 20.0)), ('click', (30.0, 40.0))])
+        self.assertEqual(paste.actions, [('paste', 'First'), ('paste', 'Second')])
+
     def test_clicks_before_paste_when_anchor_exists(self) -> None:
         actions: list[tuple[str, object]] = []
         clicker = RecordingClicker()
