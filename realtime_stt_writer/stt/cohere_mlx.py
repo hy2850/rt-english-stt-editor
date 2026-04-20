@@ -18,7 +18,7 @@ class CohereMLXEngine:
             import array
         except ImportError as exc:
             raise RuntimeError(
-                "mlx-audio is required for CohereMLXEngine warmup"
+                "mlx-audio is required for English STT. Install/update the project dependencies with `python3 -m pip install -e .`. MLX audio is supported on Apple Silicon macOS; if pip still skips it, recreate the virtualenv with arm64 Python."
             ) from exc
 
         self.model = load(self.model_id)

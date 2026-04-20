@@ -108,6 +108,8 @@ source .venv/bin/activate
 python3 -m pip install -e .
 ```
 
+On Apple Silicon macOS this installs the MLX STT runtime (`mlx` + `mlx-audio`). If `python3 -m realtime_stt_writer.app.main start` reports `No module named 'mlx_audio'`, rerun the editable install in the active virtualenv. If pip still skips `mlx-audio`, recreate the virtualenv with an arm64 Python instead of a Rosetta/x86_64 Python.
+
 On macOS, grant the terminal app microphone and accessibility permissions when prompted or through System Settings.
 
 ### 4. Run the live workflow

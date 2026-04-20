@@ -69,7 +69,11 @@ def main(
 
         anchor = runtime.anchor_service.arm_from_current_mouse_position()
         out.write(f'Armed target: {_describe_anchor(anchor)}\n')
-        runtime.live_loop.start()
+        try:
+            runtime.live_loop.start()
+        except RuntimeError as exc:
+            out.write(f'Cannot start live transcription: {exc}\n')
+            return 1
         out.write('Listening for English speech. Press Ctrl-C to stop.\n')
         runner = live_runner or _run_live_session
         runner(runtime.live_loop, out)

@@ -42,12 +42,15 @@ class FakeLiveLoop:
     def __init__(self) -> None:
         self.started = False
         self.stopped = False
+        self.start_error: Exception | None = None
 
     @property
     def is_running(self) -> bool:
         return self.started and not self.stopped
 
     def start(self) -> None:
+        if self.start_error is not None:
+            raise self.start_error
         self.started = True
 
     def stop(self) -> None:
@@ -178,6 +181,21 @@ class CLICommandTests(unittest.TestCase):
         self.assertEqual(self.runtime.anchor_service.arm_calls, 0)
         self.assertFalse(self.runtime.live_loop.started)
         self.assertIn('cannot start until missing permissions', stdout.getvalue().lower())
+
+    def test_start_reports_live_loop_start_errors_without_traceback(self) -> None:
+        stdout = io.StringIO()
+        self.runtime.live_loop.start_error = RuntimeError('mlx-audio is required; run python3 -m pip install -e .')
+
+        exit_code = main(
+            ['start'],
+            stdout=stdout,
+            bootstrap_factory=lambda _config_path: self.runtime,
+            live_runner=lambda loop, _stdout: loop.stop(),
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn('cannot start live transcription', stdout.getvalue().lower())
+        self.assertIn('mlx-audio is required', stdout.getvalue().lower())
 
 
 if __name__ == '__main__':
