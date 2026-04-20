@@ -22,6 +22,7 @@ class HybridInjector:
     post_click_delay_seconds: float = 0.2
     sleep_fn: Callable[[float], None] = field(default_factory=lambda: time.sleep)
     logger: RuntimeLogger | None = None
+    pointer_line_step_px: float = 24.0
 
     def insert(self, text: str) -> None:
         anchor = self.anchor_service.arm_from_current_mouse_position()
@@ -29,6 +30,7 @@ class HybridInjector:
 
         if self.ax_injector is not None and hasattr(self.ax_injector, 'try_insert'):
             if self.ax_injector.try_insert(text, anchor):
+                self._advance_pointer(anchor)
                 return
 
         if self.clicker is not None and hasattr(self.clicker, 'click'):
@@ -36,6 +38,13 @@ class HybridInjector:
             self.sleep_fn(self.post_click_delay_seconds)
 
         self.paste_injector.insert(text)
+        self._advance_pointer(anchor)
+
+    def _advance_pointer(self, anchor) -> None:
+        if self.clicker is not None and hasattr(self.clicker, 'move'):
+            next_y = anchor.y + self.pointer_line_step_px
+            self.clicker.move(anchor.x, next_y)
+            self._log(f'[target] advanced pointer to next line at ({anchor.x:.1f}, {next_y:.1f})')
 
     def _log(self, message: str) -> None:
         if self.logger is not None:

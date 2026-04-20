@@ -80,6 +80,7 @@ def build_runtime(config_path: str, *, stdout: TextIO | None = None) -> AppRunti
         clicker=MacClicker(),
         paste_injector=ClipboardPreservingPasteInjector(),
         logger=runtime_logger,
+        pointer_line_step_px=float(injection_config.get('pointer_line_step_px', 24)),
     )
     microphone_capture = MicrophoneCapture(
         sample_rate=sample_rate,

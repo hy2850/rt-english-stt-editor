@@ -36,6 +36,7 @@ injection:
   separator: "\n"
   append_terminal_punctuation: true
   restore_clipboard: true
+  pointer_line_step_px: 24
 
 hotkeys:
   start_stop: "alt+cmd+s"

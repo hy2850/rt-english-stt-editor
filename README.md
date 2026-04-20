@@ -44,7 +44,7 @@ Before running it:
 5. Speak in English.
 6. The app finalizes utterances, transcribes them, resolves the current mouse target immediately before insertion, and inserts final text into that location.
 
-`start` performs the setup automatically: it reports required permissions, stops if any are missing, warms the STT engine, starts microphone capture, and runs the live transcription loop. The target is resolved again for every insertion, so moving the pointer during the session changes where the next text is inserted; pressing Enter only prints the current target for diagnostics.
+`start` performs the setup automatically: it reports required permissions, stops if any are missing, warms the STT engine, starts microphone capture, and runs the live transcription loop. The target is resolved again for every insertion, so moving the pointer during the session changes where the next text is inserted; after each insert, the app moves the pointer down by `injection.pointer_line_step_px` pixels (default `24`) to follow the next line. Pressing Enter only prints the current target for diagnostics.
 
 ## Diagnostic commands
 

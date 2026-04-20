@@ -50,6 +50,9 @@ class RecordingClicker:
     def click(self, x: float, y: float) -> None:
         self.actions.append(('click', (x, y)))
 
+    def move(self, x: float, y: float) -> None:
+        self.actions.append(('move', (x, y)))
+
 
 class RecordingPasteInjector:
     def __init__(self) -> None:
@@ -140,7 +143,7 @@ class HybridInjectorTests(unittest.TestCase):
         injector.insert('Second')
 
         self.assertEqual(anchor_service.arm_calls, 2)
-        self.assertEqual(clicker.actions, [('click', (10.0, 20.0)), ('click', (30.0, 40.0))])
+        self.assertEqual(clicker.actions, [('click', (10.0, 20.0)), ('move', (10.0, 44.0)), ('click', (30.0, 40.0)), ('move', (30.0, 64.0))])
         self.assertEqual(paste.actions, [('paste', 'First'), ('paste', 'Second')])
         self.assertIn('[target] current pointer target: unknown app at (10.0, 20.0)', logger.lines)
         self.assertIn('[target] current pointer target: unknown app at (30.0, 40.0)', logger.lines)
@@ -162,7 +165,7 @@ class HybridInjectorTests(unittest.TestCase):
         injector.insert('Second')
 
         self.assertEqual(anchor_service.arm_calls, 2)
-        self.assertEqual(clicker.actions, [('click', (10.0, 20.0)), ('click', (30.0, 40.0))])
+        self.assertEqual(clicker.actions, [('click', (10.0, 20.0)), ('move', (10.0, 44.0)), ('click', (30.0, 40.0)), ('move', (30.0, 64.0))])
         self.assertEqual(paste.actions, [('paste', 'First'), ('paste', 'Second')])
 
     def test_clicks_before_paste_when_anchor_exists(self) -> None:
@@ -182,8 +185,35 @@ class HybridInjectorTests(unittest.TestCase):
         actions.extend(clicker.actions)
         actions.extend(paste.actions)
 
-        self.assertEqual(actions, [('click', (10.0, 20.0)), ('paste', 'Hello')])
+        self.assertEqual(actions, [('click', (10.0, 20.0)), ('move', (10.0, 44.0)), ('paste', 'Hello')])
         self.assertEqual(sleep_calls, [0.2])
+
+
+    def test_moves_pointer_to_next_line_after_paste(self) -> None:
+        actions: list[tuple[str, object]] = []
+
+        class OrderedClicker:
+            def click(self, x: float, y: float) -> None:
+                actions.append(('click', (x, y)))
+
+            def move(self, x: float, y: float) -> None:
+                actions.append(('move', (x, y)))
+
+        class OrderedPaste:
+            def insert(self, text: str) -> None:
+                actions.append(('paste', text))
+
+        injector = HybridInjector(
+            anchor_service=FakeAnchorService(TargetAnchor(x=10.0, y=20.0)),
+            paste_injector=OrderedPaste(),
+            clicker=OrderedClicker(),
+            sleep_fn=lambda _seconds: None,
+            pointer_line_step_px=24.0,
+        )
+
+        injector.insert('Hello')
+
+        self.assertEqual(actions, [('click', (10.0, 20.0)), ('paste', 'Hello'), ('move', (10.0, 44.0))])
 
     def test_uses_ax_direct_insert_only_when_it_succeeds(self) -> None:
         clicker = RecordingClicker()
@@ -200,7 +230,7 @@ class HybridInjectorTests(unittest.TestCase):
         injector.insert('Hello')
 
         self.assertEqual(ax_injector.calls, [('Hello', anchor)])
-        self.assertEqual(clicker.actions, [])
+        self.assertEqual(clicker.actions, [('move', (10.0, 44.0))])
         self.assertEqual(paste.actions, [])
 
     def test_falls_back_to_click_and_paste_when_ax_insert_returns_false(self) -> None:
@@ -219,7 +249,7 @@ class HybridInjectorTests(unittest.TestCase):
         injector.insert('Hello')
 
         self.assertEqual(ax_injector.calls, [('Hello', anchor)])
-        self.assertEqual(clicker.actions, [('click', (10.0, 20.0))])
+        self.assertEqual(clicker.actions, [('click', (10.0, 20.0)), ('move', (10.0, 44.0))])
         self.assertEqual(paste.actions, [('paste', 'Hello')])
 
 
@@ -256,6 +286,19 @@ class MacClickerTests(unittest.TestCase):
                 ({'event_type': 'up', 'point': (10.0, 20.0), 'button': 'left'}, 'click-state', 1),
             ],
         )
+
+
+    def test_move_posts_mouse_move_event(self) -> None:
+        clicker = MacClicker(
+            event_factory=lambda _x, _y: [],
+            move_event_factory=lambda x, y: f'move:{x},{y}',
+            event_poster=lambda event: posted.append(event),
+        )
+        posted: list[str] = []
+
+        clicker.move(12.0, 34.0)
+
+        self.assertEqual(posted, ['move:12.0,34.0'])
 
     def test_posts_all_generated_mouse_events(self) -> None:
         posted: list[str] = []

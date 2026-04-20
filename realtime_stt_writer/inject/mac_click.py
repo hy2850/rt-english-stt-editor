@@ -13,11 +13,15 @@ MouseEventPoster = Callable[[object], None]
 @dataclass(slots=True)
 class MacClicker:
     event_factory: MouseEventFactory = field(default_factory=lambda: _create_click_events)
+    move_event_factory: Callable[[float, float], object] = field(default_factory=lambda: _create_move_event)
     event_poster: MouseEventPoster = field(default_factory=lambda: _post_mouse_event)
 
     def click(self, x: float, y: float) -> None:
         for event in self.event_factory(x, y):
             self.event_poster(event)
+
+    def move(self, x: float, y: float) -> None:
+        self.event_poster(self.move_event_factory(x, y))
 
 
 def _create_click_events(x: float, y: float) -> list[object]:
@@ -50,6 +54,21 @@ def _create_click_events(x: float, y: float) -> list[object]:
         button=kCGMouseButtonLeft,
         click_state_field=kCGMouseEventClickState,
     )
+
+
+def _create_move_event(x: float, y: float) -> object:
+    if sys.platform != 'darwin':
+        raise RuntimeError('Synthetic mouse movement is only available on macOS.')
+
+    try:
+        from Quartz import CGEventCreateMouseEvent
+        from Quartz import CGPointMake
+        from Quartz import kCGEventMouseMoved
+        from Quartz import kCGMouseButtonLeft
+    except ImportError as exc:
+        raise RuntimeError('Quartz bindings are required for synthetic mouse movement.') from exc
+
+    return CGEventCreateMouseEvent(None, kCGEventMouseMoved, CGPointMake(x, y), kCGMouseButtonLeft)
 
 
 def build_click_events(
