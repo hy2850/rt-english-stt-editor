@@ -83,10 +83,32 @@ def _send_command_v() -> None:
     except ImportError as exc:
         raise RuntimeError('Quartz bindings are required to send the paste shortcut.') from exc
 
+    try:
+        from Quartz import CGEventSetFlags
+    except ImportError as exc:
+        raise RuntimeError('Quartz bindings are required to flag paste keyboard events.') from exc
+
+    post_command_v_events(
+        create_keyboard_event=CGEventCreateKeyboardEvent,
+        set_flags=CGEventSetFlags,
+        post_event=CGEventPost,
+        command_flag=kCGEventFlagMaskCommand,
+        event_tap=kCGHIDEventTap,
+    )
+
+
+def post_command_v_events(
+    *,
+    create_keyboard_event,
+    set_flags,
+    post_event,
+    command_flag,
+    event_tap,
+) -> None:
     keycode_v = 9
-    key_down = CGEventCreateKeyboardEvent(None, keycode_v, True)
-    key_up = CGEventCreateKeyboardEvent(None, keycode_v, False)
-    key_down.setFlags_(kCGEventFlagMaskCommand)
-    key_up.setFlags_(kCGEventFlagMaskCommand)
-    CGEventPost(kCGHIDEventTap, key_down)
-    CGEventPost(kCGHIDEventTap, key_up)
+    key_down = create_keyboard_event(None, keycode_v, True)
+    key_up = create_keyboard_event(None, keycode_v, False)
+    set_flags(key_down, command_flag)
+    set_flags(key_up, command_flag)
+    post_event(event_tap, key_down)
+    post_event(event_tap, key_up)

@@ -4,6 +4,7 @@ from realtime_stt_writer.domain.models import TargetAnchor
 from realtime_stt_writer.inject.hybrid_injector import HybridInjector
 from realtime_stt_writer.inject.mac_click import MacClicker
 from realtime_stt_writer.inject.mac_paste import ClipboardPreservingPasteInjector
+from realtime_stt_writer.inject.mac_paste import post_command_v_events
 
 
 class FakeAnchorService:
@@ -163,6 +164,30 @@ class ClipboardPreservingPasteInjectorTests(unittest.TestCase):
             ],
         )
         self.assertEqual(send_paste_calls, ['paste-shortcut'])
+
+    def test_command_v_events_are_flagged_with_quartz_function(self) -> None:
+        calls: list[tuple[str, object]] = []
+
+        def create_keyboard_event(_source, keycode: int, is_down: bool) -> dict[str, object]:
+            return {'keycode': keycode, 'is_down': is_down}
+
+        post_command_v_events(
+            create_keyboard_event=create_keyboard_event,
+            set_flags=lambda event, flags: calls.append(('flags', event.copy(), flags)),
+            post_event=lambda tap, event: calls.append(('post', tap, event.copy())),
+            command_flag=1048576,
+            event_tap='hid',
+        )
+
+        self.assertEqual(
+            calls,
+            [
+                ('flags', {'keycode': 9, 'is_down': True}, 1048576),
+                ('flags', {'keycode': 9, 'is_down': False}, 1048576),
+                ('post', 'hid', {'keycode': 9, 'is_down': True}),
+                ('post', 'hid', {'keycode': 9, 'is_down': False}),
+            ],
+        )
 
 
 if __name__ == '__main__':
