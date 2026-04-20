@@ -12,6 +12,7 @@ from realtime_stt_writer.domain.models import TargetAnchor
 
 PointerProvider = Callable[[], tuple[float, float]]
 TargetResolver = Callable[[float, float], Mapping[str, object] | None]
+InsertionCursorProvider = Callable[[], Mapping[str, object] | None]
 
 
 @dataclass(slots=True)
@@ -37,20 +38,21 @@ class MacOSTargetAnchorService:
     state: TargetAnchorState
     pointer_provider: PointerProvider = field(default_factory=lambda: _read_pointer_position)
     target_resolver: TargetResolver = field(default_factory=lambda: _resolve_target_at_point)
+    insertion_cursor_provider: InsertionCursorProvider = field(default_factory=lambda: _resolve_focused_text_cursor)
 
     def arm_from_current_mouse_position(self) -> TargetAnchor:
+        cursor_target = self.insertion_cursor_provider()
+        if cursor_target is not None:
+            anchor = _anchor_from_mapping(cursor_target)
+            self.state.set_active_anchor(anchor)
+            return anchor
+
         x, y = self.pointer_provider()
         target = self.target_resolver(x, y)
         if target is None:
             raise RuntimeError('Unable to resolve a target under the current mouse position.')
 
-        anchor = TargetAnchor(
-            x=x,
-            y=y,
-            pid=int(target['pid']) if target.get('pid') is not None else None,
-            bundle_id=str(target['bundle_id']) if target.get('bundle_id') is not None else None,
-            app_name=str(target['app_name']) if target.get('app_name') is not None else None,
-        )
+        anchor = _anchor_from_mapping({'x': x, 'y': y, **dict(target)})
         self.state.set_active_anchor(anchor)
         return anchor
 
@@ -59,6 +61,16 @@ class MacOSTargetAnchorService:
 
     def get_active_anchor(self) -> TargetAnchor | None:
         return self.state.get_active_anchor()
+
+
+def _anchor_from_mapping(payload: Mapping[str, object]) -> TargetAnchor:
+    return TargetAnchor(
+        x=float(payload['x']),
+        y=float(payload['y']),
+        pid=int(payload['pid']) if payload.get('pid') is not None else None,
+        bundle_id=str(payload['bundle_id']) if payload.get('bundle_id') is not None else None,
+        app_name=str(payload['app_name']) if payload.get('app_name') is not None else None,
+    )
 
 
 def _read_pointer_position() -> tuple[float, float]:
@@ -74,6 +86,111 @@ def _read_pointer_position() -> tuple[float, float]:
     event = CGEventCreate(None)
     location = CGEventGetLocation(event)
     return float(location.x), float(location.y)
+
+
+def _resolve_focused_text_cursor() -> Mapping[str, object] | None:
+    if sys.platform != 'darwin':
+        return None
+
+    try:
+        from ApplicationServices import AXUIElementCopyAttributeValue
+        from ApplicationServices import AXUIElementCopyParameterizedAttributeValue
+        from ApplicationServices import AXUIElementCreateSystemWide
+        from ApplicationServices import AXUIElementGetPid
+        from ApplicationServices import kAXBoundsForRangeParameterizedAttribute
+        from ApplicationServices import kAXFocusedApplicationAttribute
+        from ApplicationServices import kAXFocusedUIElementAttribute
+        from ApplicationServices import kAXSelectedTextRangeAttribute
+        from AppKit import NSRunningApplication
+    except ImportError:
+        return None
+
+    system_wide = AXUIElementCreateSystemWide()
+    focused_app = _ax_copy_attribute(AXUIElementCopyAttributeValue, system_wide, kAXFocusedApplicationAttribute)
+    if focused_app is None:
+        return None
+    focused_element = _ax_copy_attribute(AXUIElementCopyAttributeValue, focused_app, kAXFocusedUIElementAttribute)
+    if focused_element is None:
+        return None
+    selected_range = _ax_copy_attribute(AXUIElementCopyAttributeValue, focused_element, kAXSelectedTextRangeAttribute)
+    if selected_range is None:
+        return None
+    bounds = _ax_copy_parameterized_attribute(
+        AXUIElementCopyParameterizedAttributeValue,
+        focused_element,
+        kAXBoundsForRangeParameterizedAttribute,
+        selected_range,
+    )
+    point = _rect_midpoint(bounds)
+    if point is None:
+        return None
+
+    pid = _ax_pid(AXUIElementGetPid, focused_app)
+    app = NSRunningApplication.runningApplicationWithProcessIdentifier_(pid) if pid is not None else None
+    return {
+        'x': point[0],
+        'y': point[1],
+        'pid': pid,
+        'bundle_id': app.bundleIdentifier() if app is not None else None,
+        'app_name': app.localizedName() if app is not None else None,
+    }
+
+
+def _ax_copy_attribute(copy_attribute, element, attribute):
+    try:
+        result = copy_attribute(element, attribute, None)
+    except TypeError:
+        result = copy_attribute(element, attribute)
+    if isinstance(result, tuple):
+        if len(result) >= 2 and result[0] == 0:
+            return result[1]
+        return None
+    return result
+
+
+def _ax_copy_parameterized_attribute(copy_parameterized_attribute, element, attribute, parameter):
+    try:
+        result = copy_parameterized_attribute(element, attribute, parameter, None)
+    except TypeError:
+        result = copy_parameterized_attribute(element, attribute, parameter)
+    if isinstance(result, tuple):
+        if len(result) >= 2 and result[0] == 0:
+            return result[1]
+        return None
+    return result
+
+
+def _ax_pid(get_pid, element) -> int | None:
+    try:
+        result = get_pid(element, None)
+    except TypeError:
+        try:
+            return int(get_pid(element))
+        except Exception:
+            return None
+    if isinstance(result, tuple):
+        if len(result) >= 2 and result[0] == 0:
+            return int(result[1])
+        return None
+    if result is None:
+        return None
+    return int(result)
+
+
+def _rect_midpoint(rect) -> tuple[float, float] | None:
+    if rect is None:
+        return None
+    origin = getattr(rect, 'origin', None)
+    size = getattr(rect, 'size', None)
+    if origin is not None and size is not None:
+        return float(origin.x) + (float(size.width) / 2.0), float(origin.y) + (float(size.height) / 2.0)
+    if isinstance(rect, Mapping):
+        x = float(rect.get('x', rect.get('X', 0.0)))
+        y = float(rect.get('y', rect.get('Y', 0.0)))
+        width = float(rect.get('width', rect.get('Width', 0.0)))
+        height = float(rect.get('height', rect.get('Height', 0.0)))
+        return x + (width / 2.0), y + (height / 2.0)
+    return None
 
 
 def _resolve_target_at_point(x: float, y: float) -> Mapping[str, object] | None:
