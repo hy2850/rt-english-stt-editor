@@ -6,6 +6,7 @@ from realtime_stt_writer.domain.models import TargetAnchor
 from realtime_stt_writer.inject.anchor import MacOSTargetAnchorService
 from realtime_stt_writer.inject.anchor import _ax_copy_attribute
 from realtime_stt_writer.inject.anchor import _ax_copy_parameterized_attribute
+from realtime_stt_writer.inject.anchor import _build_focus_target
 from realtime_stt_writer.inject.anchor import TargetAnchorState
 
 
@@ -31,6 +32,28 @@ class AccessibilityHelperTests(unittest.TestCase):
 
         self.assertEqual(value, {'x': 1, 'y': 2, 'width': 3, 'height': 4})
         self.assertEqual(calls, [('element', 'bounds', 'range')])
+
+    def test_build_focus_target_returns_direct_paste_target_without_bounds(self) -> None:
+        class App:
+            def bundleIdentifier(self):
+                return 'md.obsidian'
+
+            def localizedName(self):
+                return 'Obsidian'
+
+        target = _build_focus_target(pid=123, app=App(), point=None)
+
+        self.assertEqual(
+            target,
+            {
+                'x': None,
+                'y': None,
+                'pid': 123,
+                'bundle_id': 'md.obsidian',
+                'app_name': 'Obsidian',
+                'click_before_insert': False,
+            },
+        )
 
 
 class TargetAnchorStateTests(unittest.TestCase):

@@ -118,6 +118,10 @@ def _resolve_focused_text_cursor() -> Mapping[str, object] | None:
     point = _rect_midpoint(bounds)
     pid = _ax_pid(AXUIElementGetPid, focused_app)
     app = NSRunningApplication.runningApplicationWithProcessIdentifier_(pid) if pid is not None else None
+    return _build_focus_target(pid=pid, app=app, point=point)
+
+
+def _build_focus_target(*, pid: int | None, app, point: tuple[float, float] | None) -> Mapping[str, object]:
     return {
         'x': point[0] if point is not None else None,
         'y': point[1] if point is not None else None,
