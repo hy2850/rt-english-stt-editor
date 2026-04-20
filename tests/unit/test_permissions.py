@@ -22,6 +22,22 @@ class PermissionCheckerTests(unittest.TestCase):
         self.assertFalse(status['granted'])
         self.assertIn('missing', status['detail'].lower())
 
+
+    def test_accessibility_checker_requests_prompt_when_missing(self) -> None:
+        prompts: list[bool] = []
+        checker = AccessibilityPermissionChecker(
+            probe=lambda: False,
+            prompt_requester=lambda: prompts.append(True),
+            platform='darwin',
+        )
+
+        status = checker.check()
+
+        self.assertFalse(status['granted'])
+        self.assertEqual(prompts, [True])
+        self.assertIn('terminal app', status['detail'].lower())
+        self.assertIn('rerun', status['detail'].lower())
+
     def test_microphone_checker_is_safe_on_non_macos(self) -> None:
         checker = MicrophonePermissionChecker(platform='linux')
 
