@@ -7,6 +7,14 @@ name = "realtime-stt-writer"
 version = "0.1.0"
 description = "Local macOS speech-to-text to editor insertion MVP"
 requires-python = ">=3.12"
+dependencies = [
+  "PyYAML>=6.0",
+  "sounddevice>=0.4.6",
+  "pyobjc-framework-AppKit>=10.0; platform_system == 'Darwin'",
+  "pyobjc-framework-Quartz>=10.0; platform_system == 'Darwin'",
+  "pyobjc-framework-ApplicationServices>=10.0; platform_system == 'Darwin'",
+  "pyobjc-framework-AVFoundation>=10.0; platform_system == 'Darwin'",
+]
 
 [tool.setuptools.packages.find]
 include = ["realtime_stt_writer*"]
