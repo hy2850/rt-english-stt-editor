@@ -39,12 +39,12 @@ Before running it:
 
 1. Open a text editor such as **TextEdit** or **Obsidian**.
 2. Run `start`.
-3. Keep or move the mouse over the editor insertion point where the next finalized utterance should be inserted.
-4. Optional: press **Enter** while the program is running to print the current pointer target for diagnostics.
+3. Click into the editor so the text insertion cursor/caret is where the next finalized utterance should be inserted.
+4. Optional: press **Enter** while the program is running to print the currently detected text cursor target for diagnostics.
 5. Speak in English.
-6. The app finalizes utterances, transcribes them, resolves the current mouse target immediately before insertion, and inserts final text into that location.
+6. The app finalizes utterances, transcribes them, resolves the focused text cursor immediately before insertion, and inserts final text into that location.
 
-`start` performs the setup automatically: it reports required permissions, stops if any are missing, warms the STT engine, starts microphone capture, and runs the live transcription loop. The target is resolved again for every insertion, so moving the pointer during the session changes where the next text is inserted; after each insert, the app moves the pointer down by `injection.pointer_line_step_px` pixels (default `24`) to follow the next line. Pressing Enter only prints the current target for diagnostics.
+`start` performs the setup automatically: it reports required permissions, stops if any are missing, warms the STT engine, starts microphone capture, and runs the live transcription loop. Insertion targeting relies on macOS Accessibility text-cursor bounds only; if the focused app does not expose a text cursor, insertion stops instead of falling back to physical mouse coordinates. After each insert, the app moves the pointer down by `injection.pointer_line_step_px` pixels (default `24`) to visually follow the next line. Pressing Enter only prints the current target for diagnostics.
 
 ## Diagnostic commands
 

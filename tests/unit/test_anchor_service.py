@@ -45,13 +45,16 @@ class TargetAnchorStateTests(unittest.TestCase):
 
 
 class MacOSTargetAnchorServiceTests(unittest.TestCase):
-    def test_arms_from_pointer_and_platform_response(self) -> None:
+    def test_arms_from_focused_text_cursor_response(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state = TargetAnchorState(storage_path=Path(temp_dir) / 'anchor.json')
             service = MacOSTargetAnchorService(
                 state=state,
-                pointer_provider=lambda: (100.0, 200.0),
-                target_resolver=lambda x, y: {
+                pointer_provider=lambda: (_ for _ in ()).throw(AssertionError('mouse pointer should not be used')),
+                target_resolver=lambda x, y: None,
+                insertion_cursor_provider=lambda: {
+                    'x': 100.0,
+                    'y': 200.0,
                     'pid': 501,
                     'bundle_id': 'com.apple.TextEdit',
                     'app_name': 'TextEdit',
@@ -108,12 +111,13 @@ class MacOSTargetAnchorServiceTests(unittest.TestCase):
             )
             self.assertEqual(pointer_calls, [])
 
-    def test_falls_back_to_mouse_pointer_when_text_cursor_is_unavailable(self) -> None:
+    def test_refuses_to_arm_when_text_cursor_is_unavailable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state = TargetAnchorState(storage_path=Path(temp_dir) / 'anchor.json')
+            pointer_calls: list[str] = []
             service = MacOSTargetAnchorService(
                 state=state,
-                pointer_provider=lambda: (100.0, 200.0),
+                pointer_provider=lambda: pointer_calls.append('pointer') or (100.0, 200.0),
                 target_resolver=lambda x, y: {
                     'pid': 501,
                     'bundle_id': 'com.apple.TextEdit',
@@ -122,22 +126,22 @@ class MacOSTargetAnchorServiceTests(unittest.TestCase):
                 insertion_cursor_provider=lambda: None,
             )
 
-            anchor = service.arm_from_current_mouse_position()
+            with self.assertRaisesRegex(RuntimeError, 'text cursor'):
+                service.arm_from_current_mouse_position()
 
-            self.assertEqual(anchor.x, 100.0)
-            self.assertEqual(anchor.y, 200.0)
-            self.assertEqual(anchor.app_name, 'TextEdit')
+            self.assertEqual(pointer_calls, [])
 
     def test_refuses_to_arm_when_target_cannot_be_resolved(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state = TargetAnchorState(storage_path=Path(temp_dir) / 'anchor.json')
             service = MacOSTargetAnchorService(
                 state=state,
-                pointer_provider=lambda: (100.0, 200.0),
+                pointer_provider=lambda: (_ for _ in ()).throw(AssertionError('mouse pointer should not be used')),
                 target_resolver=lambda x, y: None,
+                insertion_cursor_provider=lambda: None,
             )
 
-            with self.assertRaisesRegex(RuntimeError, 'resolve'):
+            with self.assertRaisesRegex(RuntimeError, 'text cursor'):
                 service.arm_from_current_mouse_position()
 
             self.assertIsNone(service.get_active_anchor())

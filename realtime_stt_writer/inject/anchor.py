@@ -42,17 +42,10 @@ class MacOSTargetAnchorService:
 
     def arm_from_current_mouse_position(self) -> TargetAnchor:
         cursor_target = self.insertion_cursor_provider()
-        if cursor_target is not None:
-            anchor = _anchor_from_mapping(cursor_target)
-            self.state.set_active_anchor(anchor)
-            return anchor
+        if cursor_target is None:
+            raise RuntimeError('Unable to resolve the focused text cursor. Click into a text editor first.')
 
-        x, y = self.pointer_provider()
-        target = self.target_resolver(x, y)
-        if target is None:
-            raise RuntimeError('Unable to resolve a target under the current mouse position.')
-
-        anchor = _anchor_from_mapping({'x': x, 'y': y, **dict(target)})
+        anchor = _anchor_from_mapping(cursor_target)
         self.state.set_active_anchor(anchor)
         return anchor
 
