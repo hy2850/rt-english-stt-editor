@@ -52,6 +52,14 @@ class RecordingSegmenter:
         return None
 
 
+class RecordingLogger:
+    def __init__(self) -> None:
+        self.lines: list[str] = []
+
+    def write(self, message: str) -> None:
+        self.lines.append(message)
+
+
 class RecordingHandler:
     def __init__(self) -> None:
         self.segments: list[FinalizedSegment] = []
@@ -65,11 +73,13 @@ class LiveTranscriptionLoopTests(unittest.TestCase):
         capture = FakeCapture()
         segmenter = RecordingSegmenter()
         handler = RecordingHandler()
+        logger = RecordingLogger()
         loop = LiveTranscriptionLoop(
             capture=capture,
             segmenter=segmenter,
             segment_handler=handler,
             stt_engine=RecordingSTT(),
+            logger=logger,
         )
         capture.queue.put(
             {
@@ -87,6 +97,7 @@ class LiveTranscriptionLoopTests(unittest.TestCase):
         self.assertEqual(segmenter.frames[0].sample_rate, 16000)
         self.assertEqual(segmenter.frames[0].timestamp, 42.0)
         self.assertEqual(handler.segments[0].segment_id, 'seg-live')
+        self.assertIn('[audio] finalized segment seg-live (0.10s)', logger.lines)
 
     def test_start_warms_stt_before_starting_capture_and_worker(self) -> None:
         events: list[str] = []

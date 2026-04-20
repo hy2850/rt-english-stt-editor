@@ -7,14 +7,18 @@ from dataclasses import dataclass
 from dataclasses import field
 from typing import Callable
 from typing import Iterable
+from typing import Protocol
 
 from realtime_stt_writer.domain.models import AudioFrame
-from realtime_stt_writer.domain.models import FinalizedSegment
 from realtime_stt_writer.domain.protocols import SegmentHandler
 from realtime_stt_writer.domain.protocols import STTEngine
 
 
 WorkerFactory = Callable[[Callable[[], None]], threading.Thread | None]
+
+
+class RuntimeLogger(Protocol):
+    def write(self, message: str) -> None: ...
 
 
 @dataclass(slots=True)
@@ -25,6 +29,7 @@ class LiveTranscriptionLoop:
     stt_engine: STTEngine
     poll_timeout_seconds: float = 0.2
     worker_factory: WorkerFactory = field(default_factory=lambda: _default_worker_factory)
+    logger: RuntimeLogger | None = None
     _worker: threading.Thread | None = field(default=None, init=False)
     _running: bool = field(default=False, init=False)
 
@@ -35,12 +40,15 @@ class LiveTranscriptionLoop:
     def start(self) -> None:
         if self._running:
             return
+        self._log('[startup] warming STT engine')
         self.stt_engine.warmup()
+        self._log('[startup] starting microphone capture')
         self.capture.start()
         self._running = True
         self._worker = self.worker_factory(self._worker_loop)
         if self._worker is not None:
             self._worker.start()
+        self._log('[ready] listening for speech')
 
     def stop(self) -> None:
         if hasattr(self.capture, 'stop'):
@@ -50,6 +58,7 @@ class LiveTranscriptionLoop:
             self._worker.join(timeout=2.0)
         final_segment = self.segmenter.flush()
         if final_segment is not None:
+            self._log_segment(final_segment)
             self.segment_handler.on_finalized_segment(final_segment)
 
     def process_next_chunk(self, *, block: bool = True) -> bool:
@@ -59,6 +68,7 @@ class LiveTranscriptionLoop:
             return False
         frame = audio_frame_from_capture_chunk(chunk)
         for segment in self.segmenter.feed(frame):
+            self._log_segment(segment)
             self.segment_handler.on_finalized_segment(segment)
         return True
 
@@ -74,6 +84,13 @@ class LiveTranscriptionLoop:
     def _worker_loop(self) -> None:
         while self._running or getattr(self.capture, 'is_running', False):
             self.process_next_chunk(block=True)
+
+    def _log_segment(self, segment) -> None:
+        self._log(f'[audio] finalized segment {segment.segment_id} ({segment.ended_at - segment.started_at:.2f}s)')
+
+    def _log(self, message: str) -> None:
+        if self.logger is not None:
+            self.logger.write(message)
 
 
 def _default_worker_factory(target: Callable[[], None]) -> threading.Thread:

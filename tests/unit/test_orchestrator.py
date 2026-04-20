@@ -30,6 +30,14 @@ class FakeSTTEngine:
         )
 
 
+class RecordingLogger:
+    def __init__(self) -> None:
+        self.lines: list[str] = []
+
+    def write(self, message: str) -> None:
+        self.lines.append(message)
+
+
 class RecordingInjector:
     def __init__(self) -> None:
         self.inserted: list[str] = []
@@ -41,10 +49,12 @@ class RecordingInjector:
 class AppOrchestratorTests(unittest.TestCase):
     def test_inserts_cleaned_sentence_with_newline_formatting(self) -> None:
         injector = RecordingInjector()
+        logger = RecordingLogger()
         orchestrator = AppOrchestrator(
             stt_engine=FakeSTTEngine("um I want ask about the homework"),
             cleanup_pipeline=CleanupPipeline(rule_engine=RuleBasedCleanup()),
             injector=injector,
+            logger=logger,
         )
 
         orchestrator.on_finalized_segment(
@@ -58,6 +68,8 @@ class AppOrchestratorTests(unittest.TestCase):
         )
 
         self.assertEqual(injector.inserted, ["I want ask about the homework.\n"])
+        self.assertIn('[stt] seg-1 raw: um I want ask about the homework', logger.lines)
+        self.assertIn('[insert] seg-1 inserted: I want ask about the homework.', logger.lines)
 
     def test_skips_duplicate_segment_ids(self) -> None:
         injector = RecordingInjector()

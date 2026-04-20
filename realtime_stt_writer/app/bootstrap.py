@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import sys
 from typing import Any
+from typing import TextIO
+from typing import cast
 
 import yaml
 
@@ -26,6 +29,15 @@ from realtime_stt_writer.stt.factory import build_stt_engine
 
 
 @dataclass(slots=True)
+class ConsoleRuntimeLogger:
+    stream: TextIO
+
+    def write(self, message: str) -> None:
+        self.stream.write(f'{message}\n')
+        self.stream.flush()
+
+
+@dataclass(slots=True)
 class AppRuntime:
     permission_checkers: list[PermissionChecker]
     anchor_service: TargetAnchorService
@@ -42,13 +54,15 @@ def load_config(config_path: str) -> dict[str, Any]:
     return loaded
 
 
-def build_runtime(config_path: str) -> AppRuntime:
+def build_runtime(config_path: str, *, stdout: TextIO | None = None) -> AppRuntime:
     config = load_config(config_path)
     audio_config = config.get('audio', {})
     endpoint_config = config.get('endpointing', {})
     stt_config = config.get('stt', {})
     injection_config = config.get('injection', {})
     cleanup_config = config.get('cleanup', {})
+    stream = stdout if stdout is not None else cast(TextIO, sys.stdout)
+    runtime_logger = ConsoleRuntimeLogger(stream)
 
     sample_rate = int(audio_config.get('preferred_sample_rate', 16000))
     channels = int(audio_config.get('channels', 1))
@@ -87,6 +101,7 @@ def build_runtime(config_path: str) -> AppRuntime:
         separator=injection_config.get('separator', '\n'),
         add_terminal_punctuation=bool(injection_config.get('append_terminal_punctuation', True)),
         context_window=int(cleanup_config.get('context_size', 2)),
+        logger=runtime_logger,
     )
     endpointing = EndpointingSegmenter(
         sample_rate=sample_rate,
@@ -101,6 +116,7 @@ def build_runtime(config_path: str) -> AppRuntime:
         segmenter=endpointing,
         segment_handler=orchestrator,
         stt_engine=stt_engine,
+        logger=runtime_logger,
     )
     return AppRuntime(
         permission_checkers=[

@@ -95,7 +95,7 @@ class CLICommandTests(unittest.TestCase):
             y=200.0,
             pid=501,
             bundle_id='com.apple.TextEdit',
-            app_name='TextEdit',
+            app_name='Dock',
         )
         self.runtime = FakeRuntime(
             permission_checkers=[
@@ -121,7 +121,7 @@ class CLICommandTests(unittest.TestCase):
         exit_code = main(
             ['paste-demo', '--text', 'Hello from the injector.'],
             stdout=stdout,
-            bootstrap_factory=lambda _config_path: self.runtime,
+            bootstrap_factory=lambda _config_path, **_kwargs: self.runtime,
         )
 
         self.assertEqual(exit_code, 0)
@@ -134,7 +134,7 @@ class CLICommandTests(unittest.TestCase):
         exit_code = main(
             ['start-capture'],
             stdout=stdout,
-            bootstrap_factory=lambda _config_path: self.runtime,
+            bootstrap_factory=lambda _config_path, **_kwargs: self.runtime,
             capture_runner=lambda capture, _stdout: capture.stop(),
         )
 
@@ -149,7 +149,7 @@ class CLICommandTests(unittest.TestCase):
         exit_code = main(
             ['start'],
             stdout=stdout,
-            bootstrap_factory=lambda _config_path: self.runtime,
+            bootstrap_factory=lambda _config_path, **_kwargs: self.runtime,
             live_runner=lambda loop, _stdout: loop.stop(),
         )
 
@@ -161,6 +161,7 @@ class CLICommandTests(unittest.TestCase):
         self.assertIn('accessibility: granted', output)
         self.assertIn('microphone: granted', output)
         self.assertIn('armed target', output)
+        self.assertIn('warning: target appears to be dock', output)
         self.assertIn('listening for english speech', output)
 
     def test_start_exits_before_arming_when_permissions_are_missing(self) -> None:
@@ -173,7 +174,7 @@ class CLICommandTests(unittest.TestCase):
         exit_code = main(
             ['start'],
             stdout=stdout,
-            bootstrap_factory=lambda _config_path: self.runtime,
+            bootstrap_factory=lambda _config_path, **_kwargs: self.runtime,
             live_runner=lambda loop, _stdout: loop.stop(),
         )
 
@@ -189,7 +190,7 @@ class CLICommandTests(unittest.TestCase):
         exit_code = main(
             ['start'],
             stdout=stdout,
-            bootstrap_factory=lambda _config_path: self.runtime,
+            bootstrap_factory=lambda _config_path, **_kwargs: self.runtime,
             live_runner=lambda loop, _stdout: loop.stop(),
         )
 
